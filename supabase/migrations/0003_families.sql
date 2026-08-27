@@ -31,6 +31,68 @@ create table public.family_members (
 create index family_members_user_id_idx on public.family_members (user_id);
 create index family_members_family_id_idx on public.family_members (family_id);
 
+-- RLS helper functions -----------------------------------------------------
+-- These are SECURITY DEFINER so they can look up membership without being
+-- blocked by the RLS they are used to enforce, but they only ever return
+-- booleans/ids derived from auth.uid() - never raw row data. They live here
+-- (rather than in 0001) because Postgres validates a SQL-language function's
+-- body against the catalog at CREATE FUNCTION time, so family_members must
+-- already exist.
+
+-- Is the current user a member of the given family? --------------------------
+create or replace function public.is_family_member(target_family_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.family_members fm
+    where fm.family_id = target_family_id
+      and fm.user_id = auth.uid()
+  );
+$$;
+
+-- Does the current user hold one of the given roles in the family? -----------
+create or replace function public.has_family_role(target_family_id uuid, roles public.family_role[])
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.family_members fm
+    where fm.family_id = target_family_id
+      and fm.user_id = auth.uid()
+      and fm.role = any(roles)
+  );
+$$;
+
+-- Convenience: admin or parent (the two roles allowed to manage shared data) --
+create or replace function public.is_family_manager(target_family_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.has_family_role(target_family_id, array['admin', 'parent']::public.family_role[]);
+$$;
+
+create or replace function public.is_family_admin(target_family_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.has_family_role(target_family_id, array['admin']::public.family_role[]);
+$$;
+
 create table public.family_invitations (
   id uuid primary key default gen_random_uuid(),
   family_id uuid not null references public.families (id) on delete cascade,
