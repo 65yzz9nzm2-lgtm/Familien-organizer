@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase'
 
 function redirectTo(path: string) {
-  return `${window.location.origin}${path}`
+  // BASE_URL already has a leading and trailing slash (e.g. '/' locally,
+  // '/Familien-organizer/' on GitHub Pages), so strip the leading slash off
+  // `path` to avoid a double slash when joining them.
+  return `${window.location.origin}${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 }
 
 export const authService = {
