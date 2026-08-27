@@ -17,6 +17,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Same environment as the deploy job below: if the Supabase secrets were
+    # added as "Environment secrets" under github-pages rather than
+    # top-level "Repository secrets", this job needs to run in that
+    # environment too or it won't see them (repository secrets are visible
+    # to every job either way, so this is safe regardless of which tab
+    # they were actually added under).
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +36,17 @@ jobs:
       - run: npm ci
 
       - run: npm run test
+
+      - name: Check Supabase secrets are visible to this job
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error::VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY is empty. Add them under Settings -> Secrets and variables -> Actions -> Repository secrets (exact names, no extra spaces)."
+            exit 1
+          fi
+          echo "Both Supabase secrets are present."
 
       - name: Build
         env:
