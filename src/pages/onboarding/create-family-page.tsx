@@ -43,7 +43,7 @@ export default function CreateFamilyPage() {
     if (!user) return
     setError(null)
     try {
-      await familyService.createFamily(user.id, { ...values, color })
+      await familyService.createFamily({ ...values, color })
       await refresh()
       navigate('/dashboard', { replace: true })
     } catch {
