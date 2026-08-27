@@ -96,8 +96,10 @@ Google-Login läuft über Supabase Auth – im Frontend ist dafür kein API-Key 
 1. **Authentication → Providers → Google** aktivieren.
 2. Client ID und Client Secret aus Schritt 5.1 eintragen.
 3. **Authentication → URL Configuration**:
-   - Site URL: `http://localhost:5173` (lokal) bzw. eure Produktions-URL
-   - Redirect URLs: zusätzlich `http://localhost:5173/**` (und eure Produktions-Domain) freigeben
+   - Site URL: `http://localhost:5173` (lokal) bzw. eure Produktions-URL, z. B.
+     `https://<github-username>.github.io/Familien-organizer/` bei GitHub Pages
+   - Redirect URLs: zusätzlich `http://localhost:5173/**` und
+     `https://<github-username>.github.io/Familien-organizer/**` freigeben
 
 Damit funktioniert „Mit Google anmelden" ohne weitere Code-Änderungen.
 
@@ -127,6 +129,40 @@ npm run preview
 1. `npm run build && npm run preview`
 2. Im Browser öffnen, DevTools → Application → Manifest/Service Worker prüfen
 3. Auf dem Smartphone: Seite öffnen → „Zum Startbildschirm hinzufügen"
+
+## 10. Live-Deployment + auf dem iPhone installieren (GitHub Pages)
+
+Die App ist bereits als PWA gebaut und es liegt ein fertiger Deploy-Workflow unter
+`.github/workflows/deploy-pages.yml`. Damit er läuft, sind einmalig drei manuelle Schritte im
+GitHub-Repository nötig (aus Sicherheitsgründen kann/soll das niemand automatisch für euch machen):
+
+1. **Repository öffentlich stellen** (nötig, weil GitHub Pages bei privaten Repos ein bezahltes Abo
+   voraussetzt): *Settings → General → Danger Zone → Change repository visibility → Public*.
+   Es landen dabei keine Secrets im Code – der Supabase `anon key` ist bewusst öffentlich nutzbar,
+   eure Daten bleiben durch Row Level Security geschützt.
+2. **GitHub Pages aktivieren**: *Settings → Pages → Build and deployment → Source: „GitHub Actions"*.
+3. **Supabase-Zugangsdaten als Secrets hinterlegen**: *Settings → Secrets and variables → Actions →
+   New repository secret* – je einen Secret namens `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY`
+   mit euren echten Werten aus Schritt 2 anlegen.
+
+Sobald das erledigt ist, läuft der Workflow bei jedem Push auf `main` automatisch (oder manuell über
+*Actions → Deploy to GitHub Pages → Run workflow*) und veröffentlicht die App unter:
+
+```
+https://<github-benutzername>.github.io/Familien-organizer/
+```
+
+Diese URL auch bei **Google OAuth** (Schritt 5.2) und den **Supabase Redirect URLs** eintragen.
+
+**Auf dem iPhone installieren:**
+
+1. Die obige URL in **Safari** öffnen (Chrome funktioniert nicht für „Zum Home-Bildschirm").
+2. Teilen-Symbol antippen → **„Zum Home-Bildschirm"**.
+3. FamilyHub erscheint als App-Icon, startet ohne Adressleiste und funktioniert (nach dem ersten
+   Laden) auch offline-tolerant für bereits geladene Seiten.
+
+Jedes Familienmitglied macht das auf seinem eigenen iPhone – alle greifen dabei auf dieselbe
+Supabase-Datenbank zu und sehen (je nach Berechtigung) dieselben Familiendaten in Echtzeit.
 
 ## Projektstruktur
 
