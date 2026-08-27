@@ -37,27 +37,21 @@ export const familyService = {
     return data ?? []
   },
 
-  async createFamily(userId: string, input: CreateFamilyInput) {
-    const { data: family, error: familyError } = await supabase
-      .from('families')
-      .insert({
-        name: input.name,
-        color: input.color ?? '#6366f1',
-        country: input.country ?? 'DE',
-        currency: input.currency ?? 'EUR',
-        image_url: input.imageUrl,
-        created_by: userId,
-      })
-      .select()
-      .single()
-    if (familyError) throw familyError
-
-    const { error: memberError } = await supabase
-      .from('family_members')
-      .insert({ family_id: family.id, user_id: userId, role: 'admin' })
-    if (memberError) throw memberError
-
-    return family
+  async createFamily(input: CreateFamilyInput) {
+    // Creating the family and the creator's admin membership row has to
+    // happen atomically in one SECURITY DEFINER function: Postgres enforces
+    // the SELECT policy on rows returned by INSERT ... RETURNING, and at the
+    // moment the family is inserted the creator isn't a member of it yet, so
+    // two separate client-side inserts would fail RLS on the very first one.
+    const { data, error } = await supabase.rpc('create_family_with_admin', {
+      p_name: input.name,
+      p_color: input.color ?? '#6366f1',
+      p_country: input.country ?? 'DE',
+      p_currency: input.currency ?? 'EUR',
+      p_image_url: input.imageUrl,
+    })
+    if (error) throw error
+    return data
   },
 
   async joinByCode(code: string): Promise<string> {

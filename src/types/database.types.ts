@@ -441,6 +441,16 @@ export interface Database {
         Args: Record<string, never>
         Returns: string
       }
+      create_family_with_admin: {
+        Args: {
+          p_name: string
+          p_color?: string
+          p_country?: string
+          p_currency?: string
+          p_image_url?: string | null
+        }
+        Returns: Database['public']['Tables']['families']['Row']
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
