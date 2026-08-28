@@ -63,3 +63,33 @@ export function savingsRate(incomeCents: number, expensesCents: number): number 
   if (incomeCents <= 0) return 0
   return Math.max(0, (incomeCents - expensesCents) / incomeCents)
 }
+
+export interface MonthlyTotals {
+  /** "YYYY-MM" */
+  monthKey: string
+  incomeCents: number
+  expenseCents: number
+}
+
+/** Groups expenses and income by calendar month (from their occurred_on date) for a statistics chart. */
+export function aggregateByMonth(
+  expenses: { occurred_on: string; amount_cents: number }[],
+  income: { occurred_on: string; amount_cents: number }[],
+): MonthlyTotals[] {
+  const byMonth = new Map<string, MonthlyTotals>()
+
+  function bucket(occurredOn: string): MonthlyTotals {
+    const monthKey = occurredOn.slice(0, 7)
+    let existing = byMonth.get(monthKey)
+    if (!existing) {
+      existing = { monthKey, incomeCents: 0, expenseCents: 0 }
+      byMonth.set(monthKey, existing)
+    }
+    return existing
+  }
+
+  for (const e of expenses) bucket(e.occurred_on).expenseCents += e.amount_cents
+  for (const i of income) bucket(i.occurred_on).incomeCents += i.amount_cents
+
+  return [...byMonth.values()].sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+}

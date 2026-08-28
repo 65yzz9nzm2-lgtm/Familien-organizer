@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aggregateByMonth,
   budgetStatus,
   intervalToMonths,
   monthlyReserveCents,
@@ -93,5 +94,42 @@ describe('savingsRate', () => {
 
   it('is 0 when there is no income', () => {
     expect(savingsRate(0, 0)).toBe(0)
+  })
+})
+
+describe('aggregateByMonth', () => {
+  it('sums expenses and income into the same bucket per calendar month', () => {
+    const expenses = [
+      { occurred_on: '2026-01-05', amount_cents: 1000 },
+      { occurred_on: '2026-01-20', amount_cents: 500 },
+      { occurred_on: '2026-02-01', amount_cents: 2000 },
+    ]
+    const income = [
+      { occurred_on: '2026-01-01', amount_cents: 380000 },
+      { occurred_on: '2026-02-01', amount_cents: 380000 },
+    ]
+
+    expect(aggregateByMonth(expenses, income)).toEqual([
+      { monthKey: '2026-01', incomeCents: 380000, expenseCents: 1500 },
+      { monthKey: '2026-02', incomeCents: 380000, expenseCents: 2000 },
+    ])
+  })
+
+  it('returns months in chronological order regardless of input order', () => {
+    const expenses = [
+      { occurred_on: '2026-03-01', amount_cents: 1 },
+      { occurred_on: '2026-01-01', amount_cents: 1 },
+      { occurred_on: '2026-02-01', amount_cents: 1 },
+    ]
+    expect(aggregateByMonth(expenses, []).map((m) => m.monthKey)).toEqual(['2026-01', '2026-02', '2026-03'])
+  })
+
+  it('returns an empty array for no transactions', () => {
+    expect(aggregateByMonth([], [])).toEqual([])
+  })
+
+  it('creates a month bucket for an income-only month with no expenses', () => {
+    const result = aggregateByMonth([], [{ occurred_on: '2026-05-01', amount_cents: 100 }])
+    expect(result).toEqual([{ monthKey: '2026-05', incomeCents: 100, expenseCents: 0 }])
   })
 })

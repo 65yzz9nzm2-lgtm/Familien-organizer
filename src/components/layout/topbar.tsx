@@ -24,7 +24,7 @@ export function Topbar() {
   const displayName = membership?.display_name ?? (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ''
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card/60 px-4 backdrop-blur lg:px-6">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card/60 px-4 backdrop-blur lg:px-6 print:hidden">
       <div className="relative hidden flex-1 max-w-sm sm:block">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input placeholder="Suchen…" className="h-9 pl-9" />
