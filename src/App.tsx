@@ -25,6 +25,7 @@ const IncomePage = lazy(() => import('@/pages/finances/income-page'))
 const RecurringPage = lazy(() => import('@/pages/finances/recurring-page'))
 const AnnualCostsPage = lazy(() => import('@/pages/finances/annual-costs-page'))
 const BudgetsPage = lazy(() => import('@/pages/finances/budgets-page'))
+const StatisticsPage = lazy(() => import('@/pages/finances/statistics-page'))
 
 const CalendarPage = lazy(() => import('@/pages/calendar/calendar-page'))
 const MealPlanPage = lazy(() => import('@/pages/meals/meal-plan-page'))
@@ -64,6 +65,7 @@ export default function App() {
                 <Route path="fixkosten" element={<RecurringPage />} />
                 <Route path="jahreskosten" element={<AnnualCostsPage />} />
                 <Route path="budgets" element={<BudgetsPage />} />
+                <Route path="statistik" element={<StatisticsPage />} />
               </Route>
 
               <Route path="/kalender" element={<CalendarPage />} />

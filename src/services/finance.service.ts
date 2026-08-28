@@ -42,6 +42,19 @@ export const financeService = {
     return data ?? []
   },
 
+  /** Expenses in an arbitrary [start, end) range, e.g. for a year or custom statistics period. */
+  async getExpensesInRange(familyId: string, start: Date, end: Date) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*, category:expense_categories(*)')
+      .eq('family_id', familyId)
+      .gte('occurred_on', start.toISOString().slice(0, 10))
+      .lt('occurred_on', end.toISOString().slice(0, 10))
+      .order('occurred_on', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  },
+
   async addExpense(input: Inserts<'expenses'>) {
     const { data, error } = await supabase.from('expenses').insert(input).select().single()
     if (error) throw error
@@ -62,6 +75,19 @@ export const financeService = {
       .gte('occurred_on', start)
       .lt('occurred_on', end)
       .order('occurred_on', { ascending: false })
+    if (error) throw error
+    return data ?? []
+  },
+
+  /** Income in an arbitrary [start, end) range, e.g. for a year or custom statistics period. */
+  async getIncomeInRange(familyId: string, start: Date, end: Date) {
+    const { data, error } = await supabase
+      .from('income')
+      .select('*')
+      .eq('family_id', familyId)
+      .gte('occurred_on', start.toISOString().slice(0, 10))
+      .lt('occurred_on', end.toISOString().slice(0, 10))
+      .order('occurred_on', { ascending: true })
     if (error) throw error
     return data ?? []
   },

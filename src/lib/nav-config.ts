@@ -44,4 +44,5 @@ export const FINANCE_TABS = [
   { label: 'Fixkosten', href: '/finanzen/fixkosten' },
   { label: 'Jahreskosten', href: '/finanzen/jahreskosten' },
   { label: 'Budgets', href: '/finanzen/budgets' },
+  { label: 'Statistik', href: '/finanzen/statistik' },
 ]
