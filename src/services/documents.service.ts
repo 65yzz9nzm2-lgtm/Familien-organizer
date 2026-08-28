@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { compressImageIfNeeded } from '@/lib/image-compression'
 import type { Inserts } from '@/types/database.types'
 
 export const documentsService = {
@@ -13,8 +14,13 @@ export const documentsService = {
   },
 
   async uploadFile(familyId: string, file: File) {
-    const path = `${familyId}/${crypto.randomUUID()}-${file.name}`
-    const { error } = await supabase.storage.from('documents').upload(path, file)
+    // Photos of documents (the common case on mobile) are downscaled and
+    // re-encoded before upload, since Supabase's free storage quota is 1 GB
+    // and an uncompressed phone photo can be 3-5 MB. PDFs and already-small
+    // images pass through unchanged.
+    const uploadable = await compressImageIfNeeded(file)
+    const path = `${familyId}/${crypto.randomUUID()}-${uploadable.name}`
+    const { error } = await supabase.storage.from('documents').upload(path, uploadable)
     if (error) throw error
     return path
   },
