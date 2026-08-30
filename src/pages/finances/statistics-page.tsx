@@ -9,12 +9,19 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useFamily } from '@/contexts/family-context'
 import { financeService } from '@/services/finance.service'
-import { aggregateByMonth, savingsRate } from '@/lib/finance-calculations'
+import {
+  buildMonthlyTotalsWithRecurring,
+  monthKeysInRange,
+  monthlyReserveCents,
+  savingsRate,
+  totalMonthlyReserveCents,
+} from '@/lib/finance-calculations'
 import { buildTransactionsCsv, downloadCsv, type CsvTransactionRow } from '@/lib/export'
 import { formatCurrency } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
 
 type ExpenseRow = Tables<'expenses'> & { category: Tables<'expense_categories'> | null }
+type RecurringExpenseRow = Tables<'recurring_expenses'> & { category: Tables<'expense_categories'> | null }
 type PeriodMode = 'year' | 'range'
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
@@ -35,6 +42,8 @@ export default function StatisticsPage() {
   const [rangeEnd, setRangeEnd] = useState(() => toDateInputValue(new Date()))
   const [expenses, setExpenses] = useState<ExpenseRow[]>([])
   const [income, setIncome] = useState<Tables<'income'>[]>([])
+  const [recurring, setRecurring] = useState<RecurringExpenseRow[]>([])
+  const [recurringIncome, setRecurringIncome] = useState<Tables<'recurring_income'>[]>([])
   const [loading, setLoading] = useState(true)
 
   const { periodStart, periodEnd } = useMemo(() => {
@@ -53,20 +62,33 @@ export default function StatisticsPage() {
     Promise.all([
       financeService.getExpensesInRange(family.id, periodStart, periodEnd),
       financeService.getIncomeInRange(family.id, periodStart, periodEnd),
+      financeService.getRecurringExpenses(family.id),
+      financeService.getRecurringIncome(family.id),
     ])
-      .then(([exp, inc]) => {
+      .then(([exp, inc, rec, recInc]) => {
         setExpenses(exp as ExpenseRow[])
         setIncome(inc)
+        setRecurring(rec as RecurringExpenseRow[])
+        setRecurringIncome(recInc)
       })
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [family?.id, periodStart.getTime(), periodEnd.getTime()])
 
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount_cents, 0)
-  const totalIncome = income.reduce((s, i) => s + i.amount_cents, 0)
+  const periodMonthKeys = useMemo(() => monthKeysInRange(periodStart, periodEnd), [periodStart, periodEnd])
+  const recurringExpenseReserve = useMemo(() => totalMonthlyReserveCents(recurring), [recurring])
+  const recurringIncomeReserve = useMemo(() => totalMonthlyReserveCents(recurringIncome), [recurringIncome])
+  const recurringExpenseTotal = recurringExpenseReserve * periodMonthKeys.length
+  const recurringIncomeTotal = recurringIncomeReserve * periodMonthKeys.length
+
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount_cents, 0) + recurringExpenseTotal
+  const totalIncome = income.reduce((s, i) => s + i.amount_cents, 0) + recurringIncomeTotal
   const rate = savingsRate(totalIncome, totalExpenses)
 
-  const monthly = useMemo(() => aggregateByMonth(expenses, income), [expenses, income])
+  const monthly = useMemo(
+    () => buildMonthlyTotalsWithRecurring(periodMonthKeys, expenses, income, recurringExpenseReserve, recurringIncomeReserve),
+    [periodMonthKeys, expenses, income, recurringExpenseReserve, recurringIncomeReserve],
+  )
   const chartData = monthly.map((m) => {
     const [, monthNum] = m.monthKey.split('-')
     return {
@@ -78,14 +100,21 @@ export default function StatisticsPage() {
 
   const byCategory = useMemo(() => {
     const map = new Map<string, { name: string; color: string; value: number }>()
-    for (const e of expenses) {
-      const key = e.category?.name ?? 'Sonstiges'
-      const existing = map.get(key)
-      if (existing) existing.value += e.amount_cents
-      else map.set(key, { name: key, color: e.category?.color ?? '#64748b', value: e.amount_cents })
+    function add(name: string, color: string, amountCents: number) {
+      const existing = map.get(name)
+      if (existing) existing.value += amountCents
+      else map.set(name, { name, color, value: amountCents })
+    }
+    for (const e of expenses) add(e.category?.name ?? 'Sonstiges', e.category?.color ?? '#64748b', e.amount_cents)
+    for (const r of recurring) {
+      add(
+        r.category?.name ?? 'Sonstiges',
+        r.category?.color ?? '#64748b',
+        monthlyReserveCents(r.amount_cents, r.interval, r.custom_interval_months) * periodMonthKeys.length,
+      )
     }
     return [...map.values()].sort((a, b) => b.value - a.value)
-  }, [expenses])
+  }, [expenses, recurring, periodMonthKeys])
 
   const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear() - i)
 
@@ -171,13 +200,13 @@ export default function StatisticsPage() {
             <Skeleton key={i} className="h-28 w-full" />
           ))}
         </div>
-      ) : expenses.length === 0 && income.length === 0 ? (
+      ) : expenses.length === 0 && income.length === 0 && recurring.length === 0 && recurringIncome.length === 0 ? (
         <EmptyState emoji="📊" title="Keine Daten für diesen Zeitraum" description="Wähle ein anderes Jahr oder einen anderen Zeitraum." />
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard icon={TrendingUp} label="Einnahmen" value={formatCurrency(totalIncome)} tone="success" />
-            <StatCard icon={TrendingDown} label="Ausgaben" value={formatCurrency(totalExpenses)} tone="destructive" />
+            <StatCard icon={TrendingUp} label="Einnahmen (inkl. fixe Einnahmen)" value={formatCurrency(totalIncome)} tone="success" />
+            <StatCard icon={TrendingDown} label="Ausgaben (inkl. Fixkosten)" value={formatCurrency(totalExpenses)} tone="destructive" />
             <StatCard icon={PiggyBank} label="Ersparnis" value={formatCurrency(totalIncome - totalExpenses)} tone="primary" />
             <StatCard icon={Wallet} label="Sparquote" value={`${Math.round(rate * 100)} %`} tone="default" />
           </div>

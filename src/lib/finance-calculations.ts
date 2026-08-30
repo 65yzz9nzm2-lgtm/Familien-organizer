@@ -93,3 +93,34 @@ export function aggregateByMonth(
 
   return [...byMonth.values()].sort((a, b) => a.monthKey.localeCompare(b.monthKey))
 }
+
+/** Every "YYYY-MM" calendar month touched by [start, end), e.g. for prorating recurring costs over a statistics period. */
+export function monthKeysInRange(start: Date, end: Date): string[] {
+  const keys: string[] = []
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+  while (cursor < end) {
+    keys.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`)
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+  return keys
+}
+
+/**
+ * Monthly totals for every month in `monthKeys` (zero-filled if a month has no logged transactions),
+ * with a constant recurring reserve (Fixkosten / fixe Einnahmen) added to each month - since those are
+ * ongoing obligations that aren't necessarily re-entered as a transaction every month.
+ */
+export function buildMonthlyTotalsWithRecurring(
+  monthKeys: string[],
+  expenses: { occurred_on: string; amount_cents: number }[],
+  income: { occurred_on: string; amount_cents: number }[],
+  recurringExpenseCentsPerMonth: number,
+  recurringIncomeCentsPerMonth: number,
+): MonthlyTotals[] {
+  const byMonth = new Map(aggregateByMonth(expenses, income).map((m) => [m.monthKey, m]))
+  return monthKeys.map((monthKey) => ({
+    monthKey,
+    incomeCents: (byMonth.get(monthKey)?.incomeCents ?? 0) + recurringIncomeCentsPerMonth,
+    expenseCents: (byMonth.get(monthKey)?.expenseCents ?? 0) + recurringExpenseCentsPerMonth,
+  }))
+}
