@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
-import { TrendingUp, TrendingDown, PiggyBank, Wallet } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, PiggyBank, Wallet } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useFamily } from '@/contexts/family-context'
@@ -12,8 +13,14 @@ import type { Tables } from '@/types/database.types'
 
 type ExpenseRow = Tables<'expenses'> & { category: Tables<'expense_categories'> | null }
 
+function startOfCurrentMonth() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), 1)
+}
+
 export default function FinanceOverviewPage() {
   const { family } = useFamily()
+  const [selectedMonth, setSelectedMonth] = useState(startOfCurrentMonth)
   const [expenses, setExpenses] = useState<ExpenseRow[]>([])
   const [income, setIncome] = useState<Tables<'income'>[]>([])
   const [recurring, setRecurring] = useState<Tables<'recurring_expenses'>[]>([])
@@ -23,8 +30,8 @@ export default function FinanceOverviewPage() {
     if (!family) return
     setLoading(true)
     Promise.all([
-      financeService.getExpenses(family.id, new Date()),
-      financeService.getIncome(family.id, new Date()),
+      financeService.getExpenses(family.id, selectedMonth),
+      financeService.getIncome(family.id, selectedMonth),
       financeService.getRecurringExpenses(family.id),
     ])
       .then(([exp, inc, rec]) => {
@@ -33,7 +40,7 @@ export default function FinanceOverviewPage() {
         setRecurring(rec)
       })
       .finally(() => setLoading(false))
-  }, [family?.id])
+  }, [family?.id, selectedMonth])
 
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount_cents, 0), [expenses])
   const totalIncome = useMemo(() => income.reduce((s, i) => s + i.amount_cents, 0), [income])
@@ -66,12 +73,36 @@ export default function FinanceOverviewPage() {
     )
   }
 
+  const monthLabel = selectedMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+  const isCurrentMonth = selectedMonth.getTime() === startOfCurrentMonth().getTime()
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+          aria-label="Vorheriger Monat"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <p className="text-sm font-medium capitalize">{monthLabel}</p>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+          disabled={isCurrentMonth}
+          aria-label="Nächster Monat"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={TrendingUp} label="Einnahmen" value={formatCurrency(totalIncome)} tone="success" />
         <StatCard icon={TrendingDown} label="Ausgaben" value={formatCurrency(totalExpenses)} tone="destructive" />
-        <StatCard icon={PiggyBank} label="Gespart diesen Monat" value={formatCurrency(savedCents)} tone="primary" />
+        <StatCard icon={PiggyBank} label="Gespart in diesem Monat" value={formatCurrency(savedCents)} tone="primary" />
         <StatCard icon={Wallet} label="Sparquote" value={`${Math.round(rate * 100)} %`} tone="default" />
       </div>
 
@@ -134,8 +165,8 @@ export default function FinanceOverviewPage() {
                   <InsightRow
                     text={
                       savedCents >= 0
-                        ? `Ihr habt diesen Monat ${formatCurrency(savedCents)} gespart.`
-                        : `Ihr habt diesen Monat ${formatCurrency(Math.abs(savedCents))} mehr ausgegeben als eingenommen.`
+                        ? `Ihr habt im ${monthLabel} ${formatCurrency(savedCents)} gespart.`
+                        : `Ihr habt im ${monthLabel} ${formatCurrency(Math.abs(savedCents))} mehr ausgegeben als eingenommen.`
                     }
                   />
                 )}

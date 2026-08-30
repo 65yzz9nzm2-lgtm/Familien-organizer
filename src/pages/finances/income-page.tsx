@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Loader2, Plus, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,9 +23,15 @@ const SOURCE_LABELS: Record<IncomeSourceType, string> = {
   other: 'Sonstige',
 }
 
+function startOfCurrentMonth() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), 1)
+}
+
 export default function IncomePage() {
   const { family, members } = useFamily()
   const { user } = useAuth()
+  const [selectedMonth, setSelectedMonth] = useState(startOfCurrentMonth)
   const [income, setIncome] = useState<Tables<'income'>[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
@@ -34,7 +40,7 @@ export default function IncomePage() {
     if (!family) return
     setLoading(true)
     try {
-      setIncome(await financeService.getIncome(family.id, new Date()))
+      setIncome(await financeService.getIncome(family.id, selectedMonth))
     } finally {
       setLoading(false)
     }
@@ -43,7 +49,7 @@ export default function IncomePage() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [family?.id])
+  }, [family?.id, selectedMonth])
 
   async function handleDelete(id: string) {
     await financeService.deleteIncome(id)
@@ -52,8 +58,32 @@ export default function IncomePage() {
 
   if (!family) return null
 
+  const monthLabel = selectedMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+  const isCurrentMonth = selectedMonth.getTime() === startOfCurrentMonth().getTime()
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+          aria-label="Vorheriger Monat"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <p className="text-sm font-medium capitalize">{monthLabel}</p>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+          disabled={isCurrentMonth}
+          aria-label="Nächster Monat"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
       {formOpen ? (
         <IncomeForm
           members={members}
@@ -87,7 +117,7 @@ export default function IncomePage() {
           ))}
         </div>
       ) : income.length === 0 ? (
-        <EmptyState emoji="💰" title="Noch keine Einnahmen erfasst" description="Erfasse Gehalt, Kindergeld & Co." />
+        <EmptyState emoji="💰" title="Noch keine Einnahmen erfasst" description={`Erfasse Gehalt, Kindergeld & Co. für ${monthLabel}.`} />
       ) : (
         <Card>
           <CardContent className="divide-y divide-border p-0">
