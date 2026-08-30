@@ -42,7 +42,7 @@ export const FINANCE_TABS = [
   { label: 'Ausgaben', href: '/finanzen/ausgaben' },
   { label: 'Einnahmen', href: '/finanzen/einnahmen' },
   { label: 'Fixkosten', href: '/finanzen/fixkosten' },
-  { label: 'Jahreskosten', href: '/finanzen/jahreskosten' },
+  { label: 'Fixe Einnahmen', href: '/finanzen/fixe-einnahmen' },
   { label: 'Budgets', href: '/finanzen/budgets' },
   { label: 'Statistik', href: '/finanzen/statistik' },
 ]

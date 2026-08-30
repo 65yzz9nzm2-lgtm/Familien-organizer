@@ -125,6 +125,28 @@ export const financeService = {
     if (error) throw error
   },
 
+  async getRecurringIncome(familyId: string) {
+    const { data, error } = await supabase
+      .from('recurring_income')
+      .select('*')
+      .eq('family_id', familyId)
+      .eq('is_active', true)
+      .order('next_due_date')
+    if (error) throw error
+    return data ?? []
+  },
+
+  async addRecurringIncome(input: Inserts<'recurring_income'>) {
+    const { data, error } = await supabase.from('recurring_income').insert(input).select().single()
+    if (error) throw error
+    return data
+  },
+
+  async deleteRecurringIncome(id: string) {
+    const { error } = await supabase.from('recurring_income').update({ is_active: false }).eq('id', id)
+    if (error) throw error
+  },
+
   async getOrCreateBudget(familyId: string, month: Date) {
     const monthDate = new Date(month.getFullYear(), month.getMonth(), 1).toISOString().slice(0, 10)
     const { data: existing, error: selectError } = await supabase
