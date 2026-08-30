@@ -11,10 +11,14 @@ export interface CreateFamilyInput {
 
 export const familyService = {
   async getMyMembership(userId: string): Promise<Tables<'family_members'> | null> {
+    // Ordered by oldest first: if a user ever ends up in more than one family
+    // (e.g. a retried/duplicate family creation), this deterministically
+    // picks their original one instead of an arbitrary row.
     const { data, error } = await supabase
       .from('family_members')
       .select('*')
       .eq('user_id', userId)
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle()
     if (error) throw error
