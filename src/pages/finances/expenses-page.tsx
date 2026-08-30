@@ -72,6 +72,10 @@ export default function ExpensesPage() {
   const monthLabel = selectedMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
   const isCurrentMonth = selectedMonth.getTime() === startOfCurrentMonth().getTime()
 
+  function memberName(userId: string | null) {
+    return members.find((m) => m.user_id === userId)?.display_name ?? 'Unbekannt'
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -124,7 +128,7 @@ export default function ExpensesPage() {
                   <div>
                     <p className="text-sm font-medium">{e.note || e.category?.name || 'Ausgabe'}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDate(e.occurred_on)} · {e.category?.name}
+                      {formatDate(e.occurred_on)} · {e.category?.name} · {memberName(e.paid_by)}
                       {e.is_private && (
                         <Badge variant="secondary" className="ml-1.5">
                           Privat

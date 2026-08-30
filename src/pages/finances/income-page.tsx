@@ -61,6 +61,10 @@ export default function IncomePage() {
   const monthLabel = selectedMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
   const isCurrentMonth = selectedMonth.getTime() === startOfCurrentMonth().getTime()
 
+  function memberName(userId: string | null) {
+    return members.find((m) => m.user_id === userId)?.display_name ?? 'Unbekannt'
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -126,7 +130,7 @@ export default function IncomePage() {
                 <div>
                   <p className="text-sm font-medium">{i.note || SOURCE_LABELS[i.source_type]}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatDate(i.occurred_on)} · {SOURCE_LABELS[i.source_type]}
+                    {formatDate(i.occurred_on)} · {SOURCE_LABELS[i.source_type]} · {memberName(i.received_by)}
                     {i.is_private && (
                       <Badge variant="secondary" className="ml-1.5">
                         Privat
