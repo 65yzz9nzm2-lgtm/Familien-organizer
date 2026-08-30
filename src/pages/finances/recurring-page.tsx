@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ export default function RecurringPage() {
   const [categories, setCategories] = useState<Tables<'expense_categories'>[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<RecurringRow | null>(null)
 
   async function load() {
     if (!family) return
@@ -44,6 +45,16 @@ export default function RecurringPage() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [family?.id])
+
+  function openForm(item: RecurringRow | null) {
+    setEditing(item)
+    setFormOpen(true)
+  }
+
+  function closeForm() {
+    setFormOpen(false)
+    setEditing(null)
+  }
 
   async function handleDelete(id: string) {
     await financeService.deleteRecurringExpense(id)
@@ -75,25 +86,37 @@ export default function RecurringPage() {
       {formOpen ? (
         <RecurringForm
           categories={categories}
-          onClose={() => setFormOpen(false)}
+          initial={editing}
+          onClose={closeForm}
           onSubmit={async (values) => {
             if (!user) return
-            await financeService.addRecurringExpense({
-              family_id: family.id,
-              category_id: values.categoryId,
-              name: values.name,
-              amount_cents: values.amountCents,
-              interval: values.interval,
-              custom_interval_months: values.interval === 'custom' ? values.customMonths : null,
-              next_due_date: values.nextDueDate,
-              created_by: user.id,
-            })
-            setFormOpen(false)
+            if (editing) {
+              await financeService.updateRecurringExpense(editing.id, {
+                category_id: values.categoryId,
+                name: values.name,
+                amount_cents: values.amountCents,
+                interval: values.interval,
+                custom_interval_months: values.interval === 'custom' ? values.customMonths : null,
+                next_due_date: values.nextDueDate,
+              })
+            } else {
+              await financeService.addRecurringExpense({
+                family_id: family.id,
+                category_id: values.categoryId,
+                name: values.name,
+                amount_cents: values.amountCents,
+                interval: values.interval,
+                custom_interval_months: values.interval === 'custom' ? values.customMonths : null,
+                next_due_date: values.nextDueDate,
+                created_by: user.id,
+              })
+            }
+            closeForm()
             await load()
           }}
         />
       ) : (
-        <Button onClick={() => setFormOpen(true)}>
+        <Button onClick={() => openForm(null)}>
           <Plus className="h-4 w-4" /> Fixkosten
         </Button>
       )}
@@ -125,6 +148,9 @@ export default function RecurringPage() {
                     </p>
                     <p className="text-[11px] text-muted-foreground">pro Monat</p>
                   </div>
+                  <Button variant="ghost" size="icon" onClick={() => openForm(item)} aria-label="Bearbeiten">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} aria-label="Löschen">
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -140,10 +166,12 @@ export default function RecurringPage() {
 
 function RecurringForm({
   categories,
+  initial,
   onSubmit,
   onClose,
 }: {
   categories: Tables<'expense_categories'>[]
+  initial: RecurringRow | null
   onSubmit: (values: {
     name: string
     amountCents: number
@@ -154,12 +182,12 @@ function RecurringForm({
   }) => Promise<void>
   onClose: () => void
 }) {
-  const [name, setName] = useState('')
-  const [amount, setAmount] = useState('')
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '')
-  const [interval, setInterval] = useState<RecurrenceInterval>('annual')
-  const [customMonths, setCustomMonths] = useState('12')
-  const [nextDueDate, setNextDueDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [name, setName] = useState(initial?.name ?? '')
+  const [amount, setAmount] = useState(initial ? (initial.amount_cents / 100).toFixed(2).replace('.', ',') : '')
+  const [categoryId, setCategoryId] = useState(initial?.category_id ?? categories[0]?.id ?? '')
+  const [interval, setInterval] = useState<RecurrenceInterval>(initial?.interval ?? 'annual')
+  const [customMonths, setCustomMonths] = useState(String(initial?.custom_interval_months ?? 12))
+  const [nextDueDate, setNextDueDate] = useState(initial?.next_due_date ?? new Date().toISOString().slice(0, 10))
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -189,7 +217,7 @@ function RecurringForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Fixkosten hinzufügen</p>
+        <p className="text-sm font-semibold">{initial ? 'Fixkosten bearbeiten' : 'Fixkosten hinzufügen'}</p>
         <button type="button" onClick={onClose} aria-label="Schließen" className="text-muted-foreground">
           <X className="h-4 w-4" />
         </button>
