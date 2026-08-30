@@ -155,6 +155,35 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['recurring_expenses']['Row']>
         Relationships: [{ foreignKeyName: 'recurring_expenses_category_id_fkey'; columns: ['category_id']; isOneToOne: false; referencedRelation: 'expense_categories'; referencedColumns: ['id'] }]
       }
+      recurring_income: {
+        Row: {
+          id: string
+          family_id: string
+          source_type: IncomeSourceType
+          name: string
+          amount_cents: number
+          currency: string
+          interval: RecurrenceInterval
+          custom_interval_months: number | null
+          next_due_date: string
+          is_private: boolean
+          owner_id: string
+          is_active: boolean
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['recurring_income']['Row']> & {
+          family_id: string
+          name: string
+          amount_cents: number
+          next_due_date: string
+          owner_id: string
+          created_by: string
+        }
+        Update: Partial<Database['public']['Tables']['recurring_income']['Row']>
+        Relationships: []
+      }
       budgets: {
         Row: { id: string; family_id: string; month: string; created_at: string }
         Insert: Partial<Database['public']['Tables']['budgets']['Row']> & { family_id: string; month: string }

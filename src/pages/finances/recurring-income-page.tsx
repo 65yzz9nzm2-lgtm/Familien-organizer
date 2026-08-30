@@ -15,13 +15,21 @@ import { monthlyReserveCents, totalMonthlyReserveCents } from '@/lib/finance-cal
 import { INTERVAL_LABELS } from '@/lib/finance-labels'
 import type { RecurrenceInterval, Tables } from '@/types/database.types'
 
-type RecurringRow = Tables<'recurring_expenses'> & { category: Tables<'expense_categories'> | null }
+type SourceType = Tables<'recurring_income'>['source_type']
 
-export default function RecurringPage() {
+const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
+  salary: 'Gehalt',
+  child_benefit: 'Kindergeld',
+  bonus: 'Bonus',
+  side_job: 'Nebenjob',
+  refund: 'Erstattung',
+  other: 'Sonstiges',
+}
+
+export default function RecurringIncomePage() {
   const { family } = useFamily()
   const { user } = useAuth()
-  const [items, setItems] = useState<RecurringRow[]>([])
-  const [categories, setCategories] = useState<Tables<'expense_categories'>[]>([])
+  const [items, setItems] = useState<Tables<'recurring_income'>[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
 
@@ -29,12 +37,8 @@ export default function RecurringPage() {
     if (!family) return
     setLoading(true)
     try {
-      const [rec, cats] = await Promise.all([
-        financeService.getRecurringExpenses(family.id),
-        financeService.getCategories(family.id, 'expense'),
-      ])
-      setItems(rec as RecurringRow[])
-      setCategories(cats)
+      const data = await financeService.getRecurringIncome(family.id)
+      setItems(data)
     } finally {
       setLoading(false)
     }
@@ -46,46 +50,38 @@ export default function RecurringPage() {
   }, [family?.id])
 
   async function handleDelete(id: string) {
-    await financeService.deleteRecurringExpense(id)
+    await financeService.deleteRecurringIncome(id)
     setItems((prev) => prev.filter((i) => i.id !== id))
   }
 
   if (!family) return null
 
   const totalMonthly = totalMonthlyReserveCents(items)
-  const totalAnnual = items.filter((i) => i.interval === 'annual').reduce((s, i) => s + i.amount_cents, 0)
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="bg-primary/5">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Empfohlene monatliche Rücklage</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalMonthly)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Jahreskosten gesamt (jährlich fällig)</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalAnnual)}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="bg-primary/5">
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Monatliche fixe Einnahmen</p>
+          <p className="text-2xl font-bold">{formatCurrency(totalMonthly)}</p>
+        </CardContent>
+      </Card>
 
       {formOpen ? (
-        <RecurringForm
-          categories={categories}
+        <RecurringIncomeForm
           onClose={() => setFormOpen(false)}
           onSubmit={async (values) => {
             if (!user) return
-            await financeService.addRecurringExpense({
+            await financeService.addRecurringIncome({
               family_id: family.id,
-              category_id: values.categoryId,
+              source_type: values.sourceType,
               name: values.name,
               amount_cents: values.amountCents,
               interval: values.interval,
               custom_interval_months: values.interval === 'custom' ? values.customMonths : null,
               next_due_date: values.nextDueDate,
+              is_private: values.isPrivate,
+              owner_id: user.id,
               created_by: user.id,
             })
             setFormOpen(false)
@@ -94,7 +90,7 @@ export default function RecurringPage() {
         />
       ) : (
         <Button onClick={() => setFormOpen(true)}>
-          <Plus className="h-4 w-4" /> Fixkosten
+          <Plus className="h-4 w-4" /> Fixe Einnahme
         </Button>
       )}
 
@@ -105,17 +101,24 @@ export default function RecurringPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState emoji="🧾" title="Noch keine Fixkosten hinterlegt" description="Miete, Versicherungen, Abos & Co." />
+        <EmptyState
+          emoji="💰"
+          title="Noch keine fixen Einnahmen hinterlegt"
+          description="Gehalt, Kindergeld & Co. — so musst du sie nicht jeden Monat neu eintragen."
+        />
       ) : (
         <Card>
           <CardContent className="divide-y divide-border p-0">
             {items.map((item) => (
               <div key={item.id} className="flex items-center justify-between gap-3 p-4">
                 <div>
-                  <p className="text-sm font-medium">{item.name}</p>
+                  <p className="text-sm font-medium">
+                    {item.name}
+                    {item.is_private && <span className="ml-2 text-[11px] text-muted-foreground">(privat)</span>}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatCurrency(item.amount_cents)} · {INTERVAL_LABELS[item.interval]} · nächste Fälligkeit{' '}
-                    {formatDate(item.next_due_date)}
+                    {SOURCE_TYPE_LABELS[item.source_type]} · {formatCurrency(item.amount_cents)} ·{' '}
+                    {INTERVAL_LABELS[item.interval]} · nächste Zahlung {formatDate(item.next_due_date)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-right">
@@ -138,28 +141,28 @@ export default function RecurringPage() {
   )
 }
 
-function RecurringForm({
-  categories,
+function RecurringIncomeForm({
   onSubmit,
   onClose,
 }: {
-  categories: Tables<'expense_categories'>[]
   onSubmit: (values: {
     name: string
     amountCents: number
-    categoryId: string
+    sourceType: SourceType
     interval: RecurrenceInterval
     customMonths: number | null
     nextDueDate: string
+    isPrivate: boolean
   }) => Promise<void>
   onClose: () => void
 }) {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '')
-  const [interval, setInterval] = useState<RecurrenceInterval>('annual')
+  const [sourceType, setSourceType] = useState<SourceType>('salary')
+  const [interval, setInterval] = useState<RecurrenceInterval>('monthly')
   const [customMonths, setCustomMonths] = useState('12')
   const [nextDueDate, setNextDueDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [isPrivate, setIsPrivate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -174,10 +177,11 @@ function RecurringForm({
       await onSubmit({
         name: name.trim(),
         amountCents,
-        categoryId,
+        sourceType,
         interval,
         customMonths: interval === 'custom' ? Number(customMonths) : null,
         nextDueDate,
+        isPrivate,
       })
     } catch {
       setError('Konnte nicht gespeichert werden.')
@@ -189,26 +193,26 @@ function RecurringForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Fixkosten hinzufügen</p>
+        <p className="text-sm font-semibold">Fixe Einnahme hinzufügen</p>
         <button type="button" onClick={onClose} aria-label="Schließen" className="text-muted-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Name</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Autoversicherung" autoFocus />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gehalt" autoFocus />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs">Betrag (€)</Label>
-          <Input inputMode="decimal" placeholder="780,00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input inputMode="decimal" placeholder="2.400,00" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Kategorie</Label>
-          <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+          <Label className="text-xs">Art</Label>
+          <Select value={sourceType} onChange={(e) => setSourceType(e.target.value as SourceType)}>
+            {Object.entries(SOURCE_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </Select>
@@ -232,17 +236,21 @@ function RecurringForm({
           </div>
         ) : (
           <div className="space-y-1">
-            <Label className="text-xs">Nächste Fälligkeit</Label>
+            <Label className="text-xs">Nächste Zahlung</Label>
             <Input type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} />
           </div>
         )}
       </div>
       {interval === 'custom' && (
         <div className="space-y-1">
-          <Label className="text-xs">Nächste Fälligkeit</Label>
+          <Label className="text-xs">Nächste Zahlung</Label>
           <Input type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} />
         </div>
       )}
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="h-4 w-4" />
+        Nur für mich sichtbar (privat)
+      </label>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
