@@ -90,6 +90,11 @@ export const familyService = {
     if (error) throw error
   },
 
+  async updateMemberDisplayName(memberId: string, displayName: string) {
+    const { error } = await supabase.from('family_members').update({ display_name: displayName }).eq('id', memberId)
+    if (error) throw error
+  },
+
   async removeMember(memberId: string) {
     const { error } = await supabase.from('family_members').delete().eq('id', memberId)
     if (error) throw error

@@ -9,13 +9,16 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/auth-context'
 import { useFamily } from '@/contexts/family-context'
 import { settingsService } from '@/services/settings.service'
+import { familyService } from '@/services/family.service'
 
 const ROLE_LABELS = { admin: 'Admin', parent: 'Elternteil', member: 'Mitglied', child: 'Kind' } as const
 
 export default function ProfilePage() {
   const { user } = useAuth()
   const { family, membership, refresh } = useFamily()
-  const [fullName, setFullName] = useState((user?.user_metadata?.full_name as string | undefined) ?? '')
+  const [fullName, setFullName] = useState(
+    () => membership?.display_name ?? (user?.user_metadata?.full_name as string | undefined) ?? '',
+  )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -25,7 +28,14 @@ export default function ProfilePage() {
     setSaving(true)
     setSaved(false)
     try {
+      // One name field updates both: profiles.full_name (used app-wide) and,
+      // if the user belongs to a family, family_members.display_name (used
+      // specifically in member lists/avatars) - so there's a single place to
+      // change your name instead of two disconnected ones.
       await settingsService.updateProfile(user!.id, { full_name: fullName })
+      if (membership) {
+        await familyService.updateMemberDisplayName(membership.id, fullName)
+      }
       await refresh()
       setSaved(true)
     } finally {
@@ -53,6 +63,7 @@ export default function ProfilePage() {
           <div className="space-y-1.5">
             <Label htmlFor="fullName">Name</Label>
             <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            <p className="text-xs text-muted-foreground">So wirst du für deine Familie angezeigt.</p>
           </div>
 
           <div className="space-y-1.5">
