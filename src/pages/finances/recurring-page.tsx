@@ -11,7 +11,7 @@ import { useFamily } from '@/contexts/family-context'
 import { useAuth } from '@/contexts/auth-context'
 import { financeService } from '@/services/finance.service'
 import { formatCurrency, formatDate, parseCurrencyToCents } from '@/lib/utils'
-import { monthlyReserveCents, totalMonthlyReserveCents } from '@/lib/finance-calculations'
+import { monthlyReserveCents, totalAnnualCents, totalMonthlyReserveCents } from '@/lib/finance-calculations'
 import { INTERVAL_LABELS } from '@/lib/finance-labels'
 import type { RecurrenceInterval, Tables } from '@/types/database.types'
 
@@ -64,7 +64,7 @@ export default function RecurringPage() {
   if (!family) return null
 
   const totalMonthly = totalMonthlyReserveCents(items)
-  const totalAnnual = items.filter((i) => i.interval === 'annual').reduce((s, i) => s + i.amount_cents, 0)
+  const totalAnnual = totalAnnualCents(items)
 
   return (
     <div className="space-y-4">
@@ -77,7 +77,7 @@ export default function RecurringPage() {
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Jahreskosten gesamt (jährlich fällig)</p>
+            <p className="text-sm text-muted-foreground">Fixkosten gesamt pro Jahr</p>
             <p className="text-2xl font-bold">{formatCurrency(totalAnnual)}</p>
           </CardContent>
         </Card>
