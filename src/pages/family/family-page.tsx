@@ -17,10 +17,13 @@ const ROLE_LABELS: Record<Tables<'family_members'>['role'], string> = {
   child: 'Kind',
 }
 
+const INVITE_ROLE_OPTIONS: Tables<'family_members'>['role'][] = ['parent', 'member', 'child']
+
 export default function FamilyPage() {
   const { user } = useAuth()
   const { family, members, isManager, refresh } = useFamily()
   const [invitations, setInvitations] = useState<Tables<'family_invitations'>[]>([])
+  const [inviteRole, setInviteRole] = useState<Tables<'family_members'>['role']>('member')
   const [creatingInvite, setCreatingInvite] = useState(false)
 
   useEffect(() => {
@@ -35,7 +38,7 @@ export default function FamilyPage() {
     if (!family || !user) return
     setCreatingInvite(true)
     try {
-      const invite = await familyService.createInvitation(family.id, user.id, 'member')
+      const invite = await familyService.createInvitation(family.id, user.id, inviteRole)
       setInvitations((prev) => [invite, ...prev])
     } finally {
       setCreatingInvite(false)
@@ -99,12 +102,26 @@ export default function FamilyPage() {
 
       {isManager && (
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
             <CardTitle>Einladungen</CardTitle>
-            <Button size="sm" onClick={handleInvite} disabled={creatingInvite}>
-              {creatingInvite ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              Einladungscode erstellen
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as Tables<'family_members'>['role'])}
+                className="h-9 w-32"
+                aria-label="Rolle für neue Einladung"
+              >
+                {INVITE_ROLE_OPTIONS.map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </Select>
+              <Button size="sm" onClick={handleInvite} disabled={creatingInvite}>
+                {creatingInvite ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                Einladungscode erstellen
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {invitations.length === 0 && <p className="text-sm text-muted-foreground">Keine aktiven Einladungen.</p>}
@@ -113,7 +130,7 @@ export default function FamilyPage() {
                 <div>
                   <p className="font-mono text-sm font-semibold tracking-widest">{inv.code}</p>
                   <p className="text-xs text-muted-foreground">
-                    Gültig bis {new Date(inv.expires_at).toLocaleDateString('de-DE')}
+                    Für {ROLE_LABELS[inv.invited_role]} · Gültig bis {new Date(inv.expires_at).toLocaleDateString('de-DE')}
                   </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(inv.code)}>
