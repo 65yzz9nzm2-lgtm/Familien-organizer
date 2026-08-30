@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,7 @@ type MealRow = Tables<'meals'> & { recipe: Tables<'recipes'> | null }
 export default function MealPlanPage() {
   const { family } = useFamily()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [meals, setMeals] = useState<MealRow[]>([])
   const [recipes, setRecipes] = useState<Tables<'recipes'>[]>([])
@@ -94,7 +95,13 @@ export default function MealPlanPage() {
       </div>
 
       {recipes.length === 0 && !loading ? (
-        <EmptyState emoji="🍽️" title="Noch keine Rezepte" description="Legt zuerst ein paar Rezepte an, um sie einzuplanen." />
+        <EmptyState
+          emoji="🍽️"
+          title="Noch keine Rezepte"
+          description="Legt zuerst ein paar Rezepte an, um sie einzuplanen."
+          actionLabel="Rezept anlegen"
+          onAction={() => navigate('/rezepte')}
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           {weekDays.map((day) => {
