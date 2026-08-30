@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   aggregateByMonth,
   budgetStatus,
+  buildMonthlyTotalsWithRecurring,
   intervalToMonths,
+  monthKeysInRange,
   monthlyReserveCents,
   savingsRate,
   totalAnnualCents,
@@ -131,5 +133,43 @@ describe('aggregateByMonth', () => {
   it('creates a month bucket for an income-only month with no expenses', () => {
     const result = aggregateByMonth([], [{ occurred_on: '2026-05-01', amount_cents: 100 }])
     expect(result).toEqual([{ monthKey: '2026-05', incomeCents: 100, expenseCents: 0 }])
+  })
+})
+
+describe('monthKeysInRange', () => {
+  it('lists every calendar month a [start, end) span touches', () => {
+    expect(monthKeysInRange(new Date(2026, 0, 1), new Date(2026, 3, 1))).toEqual([
+      '2026-01',
+      '2026-02',
+      '2026-03',
+    ])
+  })
+
+  it('includes a partial month at either edge', () => {
+    expect(monthKeysInRange(new Date(2026, 0, 15), new Date(2026, 1, 10))).toEqual(['2026-01', '2026-02'])
+  })
+
+  it('returns a single month for a same-month range', () => {
+    expect(monthKeysInRange(new Date(2026, 5, 1), new Date(2026, 5, 15))).toEqual(['2026-06'])
+  })
+})
+
+describe('buildMonthlyTotalsWithRecurring', () => {
+  it('adds a constant recurring reserve to every month and zero-fills months with no transactions', () => {
+    const expenses = [{ occurred_on: '2026-01-05', amount_cents: 1000 }]
+    const income = [{ occurred_on: '2026-01-01', amount_cents: 380000 }]
+    const monthKeys = ['2026-01', '2026-02']
+
+    expect(buildMonthlyTotalsWithRecurring(monthKeys, expenses, income, 6500, 240000)).toEqual([
+      { monthKey: '2026-01', incomeCents: 380000 + 240000, expenseCents: 1000 + 6500 },
+      { monthKey: '2026-02', incomeCents: 240000, expenseCents: 6500 },
+    ])
+  })
+
+  it('is a no-op addition when the recurring reserve is zero', () => {
+    const expenses = [{ occurred_on: '2026-01-05', amount_cents: 1000 }]
+    expect(buildMonthlyTotalsWithRecurring(['2026-01'], expenses, [], 0, 0)).toEqual([
+      { monthKey: '2026-01', incomeCents: 0, expenseCents: 1000 },
+    ])
   })
 })

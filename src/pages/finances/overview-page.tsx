@@ -8,10 +8,11 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { useFamily } from '@/contexts/family-context'
 import { financeService } from '@/services/finance.service'
 import { formatCurrency } from '@/lib/utils'
-import { savingsRate, totalMonthlyReserveCents } from '@/lib/finance-calculations'
+import { monthlyReserveCents, savingsRate, totalMonthlyReserveCents } from '@/lib/finance-calculations'
 import type { Tables } from '@/types/database.types'
 
 type ExpenseRow = Tables<'expenses'> & { category: Tables<'expense_categories'> | null }
+type RecurringExpenseRow = Tables<'recurring_expenses'> & { category: Tables<'expense_categories'> | null }
 
 function startOfCurrentMonth() {
   const now = new Date()
@@ -23,7 +24,8 @@ export default function FinanceOverviewPage() {
   const [selectedMonth, setSelectedMonth] = useState(startOfCurrentMonth)
   const [expenses, setExpenses] = useState<ExpenseRow[]>([])
   const [income, setIncome] = useState<Tables<'income'>[]>([])
-  const [recurring, setRecurring] = useState<Tables<'recurring_expenses'>[]>([])
+  const [recurring, setRecurring] = useState<RecurringExpenseRow[]>([])
+  const [recurringIncome, setRecurringIncome] = useState<Tables<'recurring_income'>[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,31 +35,47 @@ export default function FinanceOverviewPage() {
       financeService.getExpenses(family.id, selectedMonth),
       financeService.getIncome(family.id, selectedMonth),
       financeService.getRecurringExpenses(family.id),
+      financeService.getRecurringIncome(family.id),
     ])
-      .then(([exp, inc, rec]) => {
+      .then(([exp, inc, rec, recInc]) => {
         setExpenses(exp as ExpenseRow[])
         setIncome(inc)
-        setRecurring(rec)
+        setRecurring(rec as RecurringExpenseRow[])
+        setRecurringIncome(recInc)
       })
       .finally(() => setLoading(false))
   }, [family?.id, selectedMonth])
 
-  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount_cents, 0), [expenses])
-  const totalIncome = useMemo(() => income.reduce((s, i) => s + i.amount_cents, 0), [income])
-  const monthlyReserve = useMemo(() => totalMonthlyReserveCents(recurring), [recurring])
+  const recurringExpenseReserve = useMemo(() => totalMonthlyReserveCents(recurring), [recurring])
+  const recurringIncomeReserve = useMemo(() => totalMonthlyReserveCents(recurringIncome), [recurringIncome])
+  const totalExpenses = useMemo(
+    () => expenses.reduce((s, e) => s + e.amount_cents, 0) + recurringExpenseReserve,
+    [expenses, recurringExpenseReserve],
+  )
+  const totalIncome = useMemo(
+    () => income.reduce((s, i) => s + i.amount_cents, 0) + recurringIncomeReserve,
+    [income, recurringIncomeReserve],
+  )
   const savedCents = totalIncome - totalExpenses
   const rate = savingsRate(totalIncome, totalExpenses)
 
   const byCategory = useMemo(() => {
     const map = new Map<string, { name: string; color: string; value: number }>()
-    for (const e of expenses) {
-      const key = e.category?.name ?? 'Sonstiges'
-      const existing = map.get(key)
-      if (existing) existing.value += e.amount_cents
-      else map.set(key, { name: key, color: e.category?.color ?? '#64748b', value: e.amount_cents })
+    function add(name: string, color: string, amountCents: number) {
+      const existing = map.get(name)
+      if (existing) existing.value += amountCents
+      else map.set(name, { name, color, value: amountCents })
+    }
+    for (const e of expenses) add(e.category?.name ?? 'Sonstiges', e.category?.color ?? '#64748b', e.amount_cents)
+    for (const r of recurring) {
+      add(
+        r.category?.name ?? 'Sonstiges',
+        r.category?.color ?? '#64748b',
+        monthlyReserveCents(r.amount_cents, r.interval, r.custom_interval_months),
+      )
     }
     return [...map.values()].sort((a, b) => b.value - a.value)
-  }, [expenses])
+  }, [expenses, recurring])
 
   const topCategory = byCategory[0]
 
@@ -100,8 +118,8 @@ export default function FinanceOverviewPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={TrendingUp} label="Einnahmen" value={formatCurrency(totalIncome)} tone="success" />
-        <StatCard icon={TrendingDown} label="Ausgaben" value={formatCurrency(totalExpenses)} tone="destructive" />
+        <StatCard icon={TrendingUp} label="Einnahmen (inkl. fixe Einnahmen)" value={formatCurrency(totalIncome)} tone="success" />
+        <StatCard icon={TrendingDown} label="Ausgaben (inkl. Fixkosten)" value={formatCurrency(totalExpenses)} tone="destructive" />
         <StatCard icon={PiggyBank} label="Gespart in diesem Monat" value={formatCurrency(savedCents)} tone="primary" />
         <StatCard icon={Wallet} label="Sparquote" value={`${Math.round(rate * 100)} %`} tone="default" />
       </div>
@@ -158,8 +176,13 @@ export default function FinanceOverviewPage() {
                     text={`${topCategory.name} macht aktuell ${Math.round((topCategory.value / totalExpenses) * 100)} % eurer Ausgaben aus.`}
                   />
                 )}
-                {monthlyReserve > 0 && (
-                  <InsightRow text={`Für eure Jahreskosten solltet ihr ungefähr ${formatCurrency(monthlyReserve)} pro Monat zurücklegen.`} />
+                {recurringExpenseReserve > 0 && (
+                  <InsightRow
+                    text={`Darin enthalten: ${formatCurrency(recurringExpenseReserve)} anteilige Fixkosten für diesen Monat.`}
+                  />
+                )}
+                {recurringIncomeReserve > 0 && (
+                  <InsightRow text={`Darin enthalten: ${formatCurrency(recurringIncomeReserve)} fixe Einnahmen für diesen Monat.`} />
                 )}
                 {totalIncome > 0 && (
                   <InsightRow
