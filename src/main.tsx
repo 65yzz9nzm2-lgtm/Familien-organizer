@@ -5,18 +5,21 @@ import App from './App.tsx'
 import { AuthProvider } from '@/contexts/auth-context'
 import { FamilyProvider } from '@/contexts/family-context'
 import { ThemeProvider } from '@/contexts/theme-context'
+import { ErrorBoundary } from '@/components/shared/error-boundary'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <ThemeProvider>
-        <AuthProvider>
-          <FamilyProvider>
-            <App />
-          </FamilyProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <ThemeProvider>
+          <AuthProvider>
+            <FamilyProvider>
+              <App />
+            </FamilyProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

@@ -34,6 +34,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallbackDenylist: [/^\/auth\/callback/],
+        // Take control of already-open tabs as soon as a new version is
+        // available, and drop caches from previous deployments, so a
+        // background app doesn't keep serving JS chunks a newer deploy
+        // already removed from the server.
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

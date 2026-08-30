@@ -1,9 +1,10 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/layout/protected-route'
 import { OnboardingGate } from '@/components/layout/onboarding-gate'
 import { AppLayout } from '@/components/layout/app-layout'
 import { FullScreenSpinner } from '@/components/shared/full-screen-spinner'
+import { lazyWithReload as lazy } from '@/lib/lazy-with-reload'
 
 import LoginPage from '@/pages/auth/login-page'
 import RegisterPage from '@/pages/auth/register-page'
