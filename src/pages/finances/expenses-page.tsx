@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,9 +14,15 @@ import type { Tables } from '@/types/database.types'
 
 type ExpenseRow = Tables<'expenses'> & { category: Tables<'expense_categories'> | null }
 
+function startOfCurrentMonth() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), 1)
+}
+
 export default function ExpensesPage() {
   const { family, members } = useFamily()
   const { user } = useAuth()
+  const [selectedMonth, setSelectedMonth] = useState(startOfCurrentMonth)
   const [expenses, setExpenses] = useState<ExpenseRow[]>([])
   const [categories, setCategories] = useState<Tables<'expense_categories'>[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,7 +32,7 @@ export default function ExpensesPage() {
     setLoading(true)
     try {
       const [exp, cats] = await Promise.all([
-        financeService.getExpenses(family.id, new Date()),
+        financeService.getExpenses(family.id, selectedMonth),
         financeService.getCategories(family.id, 'expense'),
       ])
       setExpenses(exp as ExpenseRow[])
@@ -39,7 +45,7 @@ export default function ExpensesPage() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [family?.id])
+  }, [family?.id, selectedMonth])
 
   async function handleAdd(values: QuickMoneyFormValues) {
     if (!family || !user) return
@@ -63,8 +69,32 @@ export default function ExpensesPage() {
 
   if (!family) return null
 
+  const monthLabel = selectedMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+  const isCurrentMonth = selectedMonth.getTime() === startOfCurrentMonth().getTime()
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+          aria-label="Vorheriger Monat"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <p className="text-sm font-medium capitalize">{monthLabel}</p>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+          disabled={isCurrentMonth}
+          aria-label="Nächster Monat"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
       <QuickMoneyForm label="Ausgabe" categories={categories} members={members} onSubmit={handleAdd} />
 
       {loading ? (
@@ -77,7 +107,7 @@ export default function ExpensesPage() {
         <EmptyState
           emoji="💸"
           title="Noch keine Ausgaben erfasst"
-          description="Erfasse eure erste Ausgabe für diesen Monat."
+          description={`Erfasse eure erste Ausgabe für ${monthLabel}.`}
         />
       ) : (
         <Card>
