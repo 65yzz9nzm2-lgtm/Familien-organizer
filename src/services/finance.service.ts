@@ -120,6 +120,12 @@ export const financeService = {
     return data
   },
 
+  async updateRecurringExpense(id: string, input: Partial<Inserts<'recurring_expenses'>>) {
+    const { data, error } = await supabase.from('recurring_expenses').update(input).eq('id', id).select().single()
+    if (error) throw error
+    return data
+  },
+
   async deleteRecurringExpense(id: string) {
     const { error } = await supabase.from('recurring_expenses').update({ is_active: false }).eq('id', id)
     if (error) throw error
@@ -138,6 +144,12 @@ export const financeService = {
 
   async addRecurringIncome(input: Inserts<'recurring_income'>) {
     const { data, error } = await supabase.from('recurring_income').insert(input).select().single()
+    if (error) throw error
+    return data
+  },
+
+  async updateRecurringIncome(id: string, input: Partial<Inserts<'recurring_income'>>) {
+    const { data, error } = await supabase.from('recurring_income').update(input).eq('id', id).select().single()
     if (error) throw error
     return data
   },

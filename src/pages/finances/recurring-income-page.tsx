@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,7 @@ export default function RecurringIncomePage() {
   const [items, setItems] = useState<Tables<'recurring_income'>[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<Tables<'recurring_income'> | null>(null)
 
   async function load() {
     if (!family) return
@@ -48,6 +49,16 @@ export default function RecurringIncomePage() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [family?.id])
+
+  function openForm(item: Tables<'recurring_income'> | null) {
+    setEditing(item)
+    setFormOpen(true)
+  }
+
+  function closeForm() {
+    setFormOpen(false)
+    setEditing(null)
+  }
 
   async function handleDelete(id: string) {
     await financeService.deleteRecurringIncome(id)
@@ -69,27 +80,40 @@ export default function RecurringIncomePage() {
 
       {formOpen ? (
         <RecurringIncomeForm
-          onClose={() => setFormOpen(false)}
+          initial={editing}
+          onClose={closeForm}
           onSubmit={async (values) => {
             if (!user) return
-            await financeService.addRecurringIncome({
-              family_id: family.id,
-              source_type: values.sourceType,
-              name: values.name,
-              amount_cents: values.amountCents,
-              interval: values.interval,
-              custom_interval_months: values.interval === 'custom' ? values.customMonths : null,
-              next_due_date: values.nextDueDate,
-              is_private: values.isPrivate,
-              owner_id: user.id,
-              created_by: user.id,
-            })
-            setFormOpen(false)
+            if (editing) {
+              await financeService.updateRecurringIncome(editing.id, {
+                source_type: values.sourceType,
+                name: values.name,
+                amount_cents: values.amountCents,
+                interval: values.interval,
+                custom_interval_months: values.interval === 'custom' ? values.customMonths : null,
+                next_due_date: values.nextDueDate,
+                is_private: values.isPrivate,
+              })
+            } else {
+              await financeService.addRecurringIncome({
+                family_id: family.id,
+                source_type: values.sourceType,
+                name: values.name,
+                amount_cents: values.amountCents,
+                interval: values.interval,
+                custom_interval_months: values.interval === 'custom' ? values.customMonths : null,
+                next_due_date: values.nextDueDate,
+                is_private: values.isPrivate,
+                owner_id: user.id,
+                created_by: user.id,
+              })
+            }
+            closeForm()
             await load()
           }}
         />
       ) : (
-        <Button onClick={() => setFormOpen(true)}>
+        <Button onClick={() => openForm(null)}>
           <Plus className="h-4 w-4" /> Fixe Einnahme
         </Button>
       )}
@@ -128,6 +152,9 @@ export default function RecurringIncomePage() {
                     </p>
                     <p className="text-[11px] text-muted-foreground">pro Monat</p>
                   </div>
+                  <Button variant="ghost" size="icon" onClick={() => openForm(item)} aria-label="Bearbeiten">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} aria-label="Löschen">
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -142,9 +169,11 @@ export default function RecurringIncomePage() {
 }
 
 function RecurringIncomeForm({
+  initial,
   onSubmit,
   onClose,
 }: {
+  initial: Tables<'recurring_income'> | null
   onSubmit: (values: {
     name: string
     amountCents: number
@@ -156,13 +185,13 @@ function RecurringIncomeForm({
   }) => Promise<void>
   onClose: () => void
 }) {
-  const [name, setName] = useState('')
-  const [amount, setAmount] = useState('')
-  const [sourceType, setSourceType] = useState<SourceType>('salary')
-  const [interval, setInterval] = useState<RecurrenceInterval>('monthly')
-  const [customMonths, setCustomMonths] = useState('12')
-  const [nextDueDate, setNextDueDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [isPrivate, setIsPrivate] = useState(false)
+  const [name, setName] = useState(initial?.name ?? '')
+  const [amount, setAmount] = useState(initial ? (initial.amount_cents / 100).toFixed(2).replace('.', ',') : '')
+  const [sourceType, setSourceType] = useState<SourceType>(initial?.source_type ?? 'salary')
+  const [interval, setInterval] = useState<RecurrenceInterval>(initial?.interval ?? 'monthly')
+  const [customMonths, setCustomMonths] = useState(String(initial?.custom_interval_months ?? 12))
+  const [nextDueDate, setNextDueDate] = useState(initial?.next_due_date ?? new Date().toISOString().slice(0, 10))
+  const [isPrivate, setIsPrivate] = useState(initial?.is_private ?? false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -193,7 +222,7 @@ function RecurringIncomeForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Fixe Einnahme hinzufügen</p>
+        <p className="text-sm font-semibold">{initial ? 'Fixe Einnahme bearbeiten' : 'Fixe Einnahme hinzufügen'}</p>
         <button type="button" onClick={onClose} aria-label="Schließen" className="text-muted-foreground">
           <X className="h-4 w-4" />
         </button>
