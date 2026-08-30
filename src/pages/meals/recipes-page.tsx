@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, Heart, Loader2, Plus, Trash2, Users, X } from 'lucide-react'
+import { Camera, Clock, Heart, Loader2, Plus, Trash2, Users, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +30,7 @@ export default function RecipesPage() {
   const { family } = useFamily()
   const { user } = useAuth()
   const [recipes, setRecipes] = useState<Tables<'recipes'>[]>([])
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
 
@@ -37,7 +38,17 @@ export default function RecipesPage() {
     if (!family) return
     setLoading(true)
     try {
-      setRecipes(await mealsService.getRecipes(family.id))
+      const data = await mealsService.getRecipes(family.id)
+      setRecipes(data)
+      const withImages = data.filter((r) => r.image_url)
+      const results = await Promise.allSettled(withImages.map((r) => mealsService.getRecipeImageSignedUrl(r.image_url!)))
+      const entries = withImages
+        .map((r, i) => {
+          const result = results[i]
+          return result.status === 'fulfilled' ? ([r.id, result.value] as const) : null
+        })
+        .filter((entry): entry is readonly [string, string] => entry !== null)
+      setImageUrls(Object.fromEntries(entries))
     } finally {
       setLoading(false)
     }
@@ -66,6 +77,7 @@ export default function RecipesPage() {
         <RecipeForm
           onClose={() => setFormOpen(false)}
           onSubmit={async (values) => {
+            const imagePath = values.photo ? await mealsService.uploadRecipeImage(family.id, values.photo) : null
             await mealsService.createRecipe({
               family_id: family.id,
               name: values.name,
@@ -74,6 +86,7 @@ export default function RecipesPage() {
               prep_minutes: values.prepMinutes,
               servings: values.servings,
               category: values.category,
+              image_url: imagePath,
               created_by: user.id,
             })
             setFormOpen(false)
@@ -97,7 +110,10 @@ export default function RecipesPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {recipes.map((r) => (
-            <Card key={r.id}>
+            <Card key={r.id} className="overflow-hidden">
+              {imageUrls[r.id] && (
+                <img src={imageUrls[r.id]} alt={r.name} className="h-32 w-full object-cover" />
+              )}
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-start justify-between">
                   <p className="font-semibold">{r.name}</p>
@@ -127,7 +143,7 @@ export default function RecipesPage() {
                   size="sm"
                   className="text-destructive"
                   onClick={async () => {
-                    await mealsService.deleteRecipe(r.id)
+                    await mealsService.deleteRecipe(r.id, r.image_url)
                     setRecipes((prev) => prev.filter((x) => x.id !== r.id))
                   }}
                 >
@@ -153,6 +169,7 @@ function RecipeForm({
     prepMinutes: number
     servings: number
     category: string
+    photo: File | null
   }) => Promise<void>
   onClose: () => void
 }) {
@@ -162,8 +179,21 @@ function RecipeForm({
   const [prepMinutes, setPrepMinutes] = useState('30')
   const [servings, setServings] = useState('4')
   const [category, setCategory] = useState('Sonstiges')
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  function handlePhotoSelected(file: File | undefined) {
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    if (!file) {
+      setPhoto(null)
+      setPhotoPreview(null)
+      return
+    }
+    setPhoto(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -178,7 +208,9 @@ function RecipeForm({
         prepMinutes: Number(prepMinutes) || 0,
         servings: Number(servings) || 4,
         category,
+        photo,
       })
+      if (photoPreview) URL.revokeObjectURL(photoPreview)
     } catch {
       setError('Konnte nicht gespeichert werden.')
     } finally {
@@ -202,6 +234,27 @@ function RecipeForm({
         <div className="space-y-1">
           <Label className="text-xs">Kategorie</Label>
           <Input value={category} onChange={(e) => setCategory(e.target.value)} />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Foto (optional)</Label>
+        <div className="flex items-center gap-3">
+          {photoPreview ? (
+            <img src={photoPreview} alt="Vorschau" className="h-16 w-16 rounded-xl object-cover" />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <Camera className="h-6 w-6" />
+            </div>
+          )}
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm hover:bg-muted">
+            <Camera className="h-4 w-4" /> Foto wählen
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handlePhotoSelected(e.target.files?.[0])}
+            />
+          </label>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">

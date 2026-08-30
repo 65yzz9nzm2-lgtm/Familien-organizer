@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { compressImageIfNeeded } from '@/lib/image-compression'
 import type { Inserts, Tables } from '@/types/database.types'
 
 export const mealsService = {
@@ -14,7 +15,24 @@ export const mealsService = {
     return data
   },
 
-  async deleteRecipe(id: string) {
+  /** Compresses and uploads a recipe photo, returning the storage path to store as `recipes.image_url`. */
+  async uploadRecipeImage(familyId: string, file: File) {
+    const uploadable = await compressImageIfNeeded(file)
+    const path = `${familyId}/${crypto.randomUUID()}-${uploadable.name}`
+    const { error } = await supabase.storage.from('recipe-images').upload(path, uploadable)
+    if (error) throw error
+    return path
+  },
+
+  /** recipe-images is a private bucket, so `recipes.image_url` (a storage path) needs a signed URL to display. */
+  async getRecipeImageSignedUrl(path: string) {
+    const { data, error } = await supabase.storage.from('recipe-images').createSignedUrl(path, 60 * 60)
+    if (error) throw error
+    return data.signedUrl
+  },
+
+  async deleteRecipe(id: string, imagePath?: string | null) {
+    if (imagePath) await supabase.storage.from('recipe-images').remove([imagePath])
     const { error } = await supabase.from('recipes').delete().eq('id', id)
     if (error) throw error
   },
