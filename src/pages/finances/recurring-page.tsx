@@ -191,11 +191,19 @@ function RecurringForm({
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // The form can open before `categories` finishes its initial fetch, which would
+  // otherwise leave categoryId stuck at '' (useState's initial value is only
+  // evaluated once) and fail the insert with an invalid-uuid error.
+  useEffect(() => {
+    if (!initial && !categoryId && categories[0]) setCategoryId(categories[0].id)
+  }, [initial, categories, categoryId])
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const amountCents = parseCurrencyToCents(amount)
     if (!name.trim()) return setError('Bitte gib einen Namen ein.')
     if (!amountCents || amountCents <= 0) return setError('Bitte gib einen gültigen Betrag ein.')
+    if (!categoryId) return setError('Bitte wähle eine Kategorie.')
     setSubmitting(true)
     setError(null)
     try {
