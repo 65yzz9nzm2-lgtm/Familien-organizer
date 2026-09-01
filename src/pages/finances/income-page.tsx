@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Repeat, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Plus, Repeat, Trash2, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ export default function IncomePage() {
   const [recurring, setRecurring] = useState<Tables<'recurring_income'>[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
+  const [recurringOpen, setRecurringOpen] = useState(true)
 
   async function load() {
     if (!family) return
@@ -160,36 +161,45 @@ export default function IncomePage() {
 
       {!loading && recurring.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">Fixe Einnahmen (anteilig für {monthLabel})</p>
-          <Card>
-            <CardContent className="divide-y divide-border p-0">
-              {recurring.map((r) => (
-                <Link
-                  key={r.id}
-                  to="/finanzen/fixe-einnahmen"
-                  className="flex items-center justify-between gap-3 p-4 hover:bg-muted/40"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                      <Repeat className="h-4 w-4" />
+          <button
+            type="button"
+            onClick={() => setRecurringOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
+          >
+            {recurringOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            Fixe Einnahmen (anteilig für {monthLabel})
+          </button>
+          {recurringOpen && (
+            <Card>
+              <CardContent className="divide-y divide-border p-0">
+                {recurring.map((r) => (
+                  <Link
+                    key={r.id}
+                    to="/finanzen/fixe-einnahmen"
+                    className="flex items-center justify-between gap-3 p-4 hover:bg-muted/40"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                        <Repeat className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{r.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {SOURCE_LABELS[r.source_type]}
+                          <Badge variant="secondary" className="ml-1.5">
+                            Fixe Einnahme
+                          </Badge>
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{r.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {SOURCE_LABELS[r.source_type]}
-                        <Badge variant="secondary" className="ml-1.5">
-                          Fixe Einnahme
-                        </Badge>
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm font-semibold text-success">
-                    +{formatCurrency(monthlyReserveCents(r.amount_cents, r.interval, r.custom_interval_months))}
-                  </p>
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
+                    <p className="text-sm font-semibold text-success">
+                      +{formatCurrency(monthlyReserveCents(r.amount_cents, r.interval, r.custom_interval_months))}
+                    </p>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
