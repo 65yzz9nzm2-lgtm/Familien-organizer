@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Repeat, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,9 +11,11 @@ import { useFamily } from '@/contexts/family-context'
 import { useAuth } from '@/contexts/auth-context'
 import { financeService } from '@/services/finance.service'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { monthlyReserveCents } from '@/lib/finance-calculations'
 import type { Tables } from '@/types/database.types'
 
 type ExpenseRow = Tables<'expenses'> & { category: Tables<'expense_categories'> | null }
+type RecurringExpenseRow = Tables<'recurring_expenses'> & { category: Tables<'expense_categories'> | null }
 
 function startOfCurrentMonth() {
   const now = new Date()
@@ -25,18 +28,21 @@ export default function ExpensesPage() {
   const [selectedMonth, setSelectedMonth] = useState(startOfCurrentMonth)
   const [expenses, setExpenses] = useState<ExpenseRow[]>([])
   const [categories, setCategories] = useState<Tables<'expense_categories'>[]>([])
+  const [recurring, setRecurring] = useState<RecurringExpenseRow[]>([])
   const [loading, setLoading] = useState(true)
 
   async function load() {
     if (!family) return
     setLoading(true)
     try {
-      const [exp, cats] = await Promise.all([
+      const [exp, cats, rec] = await Promise.all([
         financeService.getExpenses(family.id, selectedMonth),
         financeService.getCategories(family.id, 'expense'),
+        financeService.getRecurringExpenses(family.id),
       ])
       setExpenses(exp as ExpenseRow[])
       setCategories(cats)
+      setRecurring(rec as RecurringExpenseRow[])
     } finally {
       setLoading(false)
     }
@@ -147,6 +153,41 @@ export default function ExpensesPage() {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {!loading && recurring.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">Fixkosten (anteilig für {monthLabel})</p>
+          <Card>
+            <CardContent className="divide-y divide-border p-0">
+              {recurring.map((r) => (
+                <Link
+                  key={r.id}
+                  to="/finanzen/fixkosten"
+                  className="flex items-center justify-between gap-3 p-4 hover:bg-muted/40"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                      <Repeat className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{r.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.category?.name}
+                        <Badge variant="secondary" className="ml-1.5">
+                          Fixkosten
+                        </Badge>
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    {formatCurrency(monthlyReserveCents(r.amount_cents, r.interval, r.custom_interval_months))}
+                  </p>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )
