@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Loader2, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +39,19 @@ export function QuickMoneyForm({
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // categories/members can still be loading when this form first mounts (it's rendered
+  // unconditionally, unlike other add-forms in the app), so categoryId/paidBy would
+  // otherwise stay stuck at '' forever once useState's initial value is evaluated -
+  // sending an empty string as a uuid and failing the insert. Fill them in once the
+  // real data arrives, but only if the user hasn't picked something themselves yet.
+  useEffect(() => {
+    if (!categoryId && categories?.[0]) setCategoryId(categories[0].id)
+  }, [categories, categoryId])
+
+  useEffect(() => {
+    if (!paidBy && members[0]) setPaidBy(members[0].user_id)
+  }, [members, paidBy])
+
   if (!open) {
     return (
       <Button onClick={() => setOpen(true)} className="w-full sm:w-auto">
@@ -53,6 +66,14 @@ export function QuickMoneyForm({
     const amountCents = parseCurrencyToCents(amount)
     if (!amountCents || amountCents <= 0) {
       setError('Bitte gib einen gültigen Betrag ein.')
+      return
+    }
+    if (showCategory && !categoryId) {
+      setError('Bitte wähle eine Kategorie.')
+      return
+    }
+    if (!paidBy) {
+      setError('Bitte wähle, wer bezahlt hat.')
       return
     }
     setSubmitting(true)
