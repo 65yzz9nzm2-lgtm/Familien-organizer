@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Repeat, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Repeat, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,7 @@ export default function ExpensesPage() {
   const [categories, setCategories] = useState<Tables<'expense_categories'>[]>([])
   const [recurring, setRecurring] = useState<RecurringExpenseRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [recurringOpen, setRecurringOpen] = useState(true)
 
   async function load() {
     if (!family) return
@@ -157,36 +158,45 @@ export default function ExpensesPage() {
 
       {!loading && recurring.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">Fixkosten (anteilig für {monthLabel})</p>
-          <Card>
-            <CardContent className="divide-y divide-border p-0">
-              {recurring.map((r) => (
-                <Link
-                  key={r.id}
-                  to="/finanzen/fixkosten"
-                  className="flex items-center justify-between gap-3 p-4 hover:bg-muted/40"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                      <Repeat className="h-4 w-4" />
+          <button
+            type="button"
+            onClick={() => setRecurringOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
+          >
+            {recurringOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            Fixkosten (anteilig für {monthLabel})
+          </button>
+          {recurringOpen && (
+            <Card>
+              <CardContent className="divide-y divide-border p-0">
+                {recurring.map((r) => (
+                  <Link
+                    key={r.id}
+                    to="/finanzen/fixkosten"
+                    className="flex items-center justify-between gap-3 p-4 hover:bg-muted/40"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                        <Repeat className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{r.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {r.category?.name}
+                          <Badge variant="secondary" className="ml-1.5">
+                            Fixkosten
+                          </Badge>
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{r.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {r.category?.name}
-                        <Badge variant="secondary" className="ml-1.5">
-                          Fixkosten
-                        </Badge>
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    {formatCurrency(monthlyReserveCents(r.amount_cents, r.interval, r.custom_interval_months))}
-                  </p>
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      {formatCurrency(monthlyReserveCents(r.amount_cents, r.interval, r.custom_interval_months))}
+                    </p>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
