@@ -48,6 +48,37 @@ export function totalAnnualCents(costs: RecurringCostLike[]): number {
   }, 0)
 }
 
+/** Parses a "YYYY-MM-DD" date column value as a local midnight Date, avoiding the UTC-parsing day shift of `new Date(str)`. */
+function parseDateOnly(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function formatDateOnly(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Rolls a recurring item's stored `next_due_date` forward by whole intervals until it lands on
+ * or after `today`, without needing to write anything back to the database - the stored date
+ * stays a fixed anchor, and every occurrence is computed live from it. A due date that's still
+ * in the future is returned unchanged.
+ */
+export function nextOccurrenceOnOrAfter(
+  anchorDate: string,
+  interval: RecurrenceInterval,
+  customMonths: number | null | undefined,
+  today: Date = new Date(),
+): string {
+  const months = intervalToMonths(interval, customMonths)
+  const ref = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  let occurrence = parseDateOnly(anchorDate)
+  while (occurrence < ref) {
+    occurrence = new Date(occurrence.getFullYear(), occurrence.getMonth() + months, occurrence.getDate())
+  }
+  return formatDateOnly(occurrence)
+}
+
 export type BudgetStatus = 'green' | 'yellow' | 'red'
 
 /** Finanz-Ampel: green under 80%, yellow 80-100%, red over budget. */
