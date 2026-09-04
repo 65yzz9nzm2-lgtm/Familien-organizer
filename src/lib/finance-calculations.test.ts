@@ -7,6 +7,7 @@ import {
   monthKeysInRange,
   monthlyReserveCents,
   nextOccurrenceOnOrAfter,
+  occurrencesInRange,
   savingsRate,
   totalAnnualCents,
   totalMonthlyReserveCents,
@@ -182,6 +183,33 @@ describe('nextOccurrenceOnOrAfter', () => {
 
   it('supports custom-month intervals', () => {
     expect(nextOccurrenceOnOrAfter('2026-01-15', 'custom', 5, new Date(2026, 8, 1))).toBe('2026-11-15')
+  })
+})
+
+describe('occurrencesInRange', () => {
+  it('lists every monthly occurrence within the range', () => {
+    expect(occurrencesInRange('2026-01-01', 'monthly', null, new Date(2026, 2, 1), new Date(2026, 5, 1))).toEqual([
+      '2026-03-01',
+      '2026-04-01',
+      '2026-05-01',
+    ])
+  })
+
+  it('rewinds past an anchor that is inside the range to find earlier occurrences too', () => {
+    expect(occurrencesInRange('2026-04-15', 'quarterly', null, new Date(2026, 0, 1), new Date(2027, 0, 1))).toEqual([
+      '2026-01-15',
+      '2026-04-15',
+      '2026-07-15',
+      '2026-10-15',
+    ])
+  })
+
+  it('returns an empty array when the interval never lands inside the range', () => {
+    expect(occurrencesInRange('2020-01-01', 'annual', null, new Date(2026, 0, 15), new Date(2026, 0, 20))).toEqual([])
+  })
+
+  it('includes an occurrence that falls exactly on rangeStart', () => {
+    expect(occurrencesInRange('2026-03-01', 'monthly', null, new Date(2026, 2, 1), new Date(2026, 3, 1))).toEqual(['2026-03-01'])
   })
 })
 
