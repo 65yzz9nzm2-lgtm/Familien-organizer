@@ -6,6 +6,7 @@ import {
   intervalToMonths,
   monthKeysInRange,
   monthlyReserveCents,
+  nextOccurrenceOnOrAfter,
   savingsRate,
   totalAnnualCents,
   totalMonthlyReserveCents,
@@ -151,6 +152,36 @@ describe('monthKeysInRange', () => {
 
   it('returns a single month for a same-month range', () => {
     expect(monthKeysInRange(new Date(2026, 5, 1), new Date(2026, 5, 15))).toEqual(['2026-06'])
+  })
+})
+
+describe('nextOccurrenceOnOrAfter', () => {
+  it('leaves a due date that is still in the future unchanged', () => {
+    expect(nextOccurrenceOnOrAfter('2026-12-01', 'annual', null, new Date(2026, 8, 1))).toBe('2026-12-01')
+  })
+
+  it('leaves a due date that falls exactly on today unchanged', () => {
+    expect(nextOccurrenceOnOrAfter('2026-09-01', 'annual', null, new Date(2026, 8, 1))).toBe('2026-09-01')
+  })
+
+  it('rolls a missed monthly due date forward to the next occurrence', () => {
+    // Rent due the 1st, checked on the 15th - should roll to next month's 1st, not stay in the past.
+    expect(nextOccurrenceOnOrAfter('2026-09-01', 'monthly', null, new Date(2026, 8, 15))).toBe('2026-10-01')
+  })
+
+  it('rolls a stale annual due date forward across multiple missed years to the next upcoming one', () => {
+    // Last set two years ago and never updated - should land on this year's date, not next year's.
+    expect(nextOccurrenceOnOrAfter('2024-08-26', 'annual', null, new Date(2026, 7, 1))).toBe('2026-08-26')
+  })
+
+  it('rolls forward by multiple intervals if several were missed', () => {
+    // Quarterly, last due 2025-01-01, checked a year and a half later - due dates were
+    // 2025-01, 04, 07, 10 and 2026-01, 04, 07 (all missed) -> next is 2026-10-01.
+    expect(nextOccurrenceOnOrAfter('2025-01-01', 'quarterly', null, new Date(2026, 8, 1))).toBe('2026-10-01')
+  })
+
+  it('supports custom-month intervals', () => {
+    expect(nextOccurrenceOnOrAfter('2026-01-15', 'custom', 5, new Date(2026, 8, 1))).toBe('2026-11-15')
   })
 })
 

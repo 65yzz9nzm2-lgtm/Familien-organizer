@@ -11,7 +11,7 @@ import { useFamily } from '@/contexts/family-context'
 import { useAuth } from '@/contexts/auth-context'
 import { financeService } from '@/services/finance.service'
 import { formatCurrency, formatDate, parseCurrencyToCents } from '@/lib/utils'
-import { monthlyReserveCents, totalAnnualCents, totalMonthlyReserveCents } from '@/lib/finance-calculations'
+import { monthlyReserveCents, nextOccurrenceOnOrAfter, totalAnnualCents, totalMonthlyReserveCents } from '@/lib/finance-calculations'
 import { INTERVAL_LABELS } from '@/lib/finance-labels'
 import type { RecurrenceInterval, Tables } from '@/types/database.types'
 
@@ -138,7 +138,7 @@ export default function RecurringPage() {
                   <p className="text-sm font-medium">{item.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {formatCurrency(item.amount_cents)} · {INTERVAL_LABELS[item.interval]} · nächste Fälligkeit{' '}
-                    {formatDate(item.next_due_date)}
+                    {formatDate(nextOccurrenceOnOrAfter(item.next_due_date, item.interval, item.custom_interval_months))}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-right">

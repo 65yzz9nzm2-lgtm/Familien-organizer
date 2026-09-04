@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { calendarService } from '@/services/calendar.service'
 import { financeService } from '@/services/finance.service'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { nextOccurrenceOnOrAfter } from '@/lib/finance-calculations'
 import { INTERVAL_LABELS } from '@/lib/finance-labels'
 import type { CalendarEventType, RecurrenceInterval, Tables } from '@/types/database.types'
 
@@ -112,12 +113,14 @@ export default function CalendarPage() {
     const dateStr = toDateStr(day)
     const due: DueItem[] = []
     for (const r of recurringExpenses) {
-      if (r.next_due_date === dateStr && intervalFilter.has(r.interval)) {
+      const occurrence = nextOccurrenceOnOrAfter(r.next_due_date, r.interval, r.custom_interval_months)
+      if (occurrence === dateStr && intervalFilter.has(r.interval)) {
         due.push({ id: r.id, name: r.name, amountCents: r.amount_cents, kind: 'expense' })
       }
     }
     for (const r of recurringIncome) {
-      if (r.next_due_date === dateStr && intervalFilter.has(r.interval)) {
+      const occurrence = nextOccurrenceOnOrAfter(r.next_due_date, r.interval, r.custom_interval_months)
+      if (occurrence === dateStr && intervalFilter.has(r.interval)) {
         due.push({ id: r.id, name: r.name, amountCents: r.amount_cents, kind: 'income' })
       }
     }
