@@ -130,12 +130,31 @@ export default function CalendarPage() {
   if (!family || !user) return null
 
   const weekHasContent = events.length > 0 || (showDueDates && weekDays.some((day) => dueItemsForDay(day).length > 0))
+  const weekEnd = weekDays[6]
+  const weekRangeLabel = `${formatDate(weekDays[0])} – ${formatDate(weekEnd)}`
+  const isCurrentWeek = weekStart.getTime() === startOfWeek(new Date()).getTime()
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Kalender</h1>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            type="date"
+            aria-label="Zu Datum springen"
+            className="w-40"
+            value={toDateStr(weekStart)}
+            onChange={(e) => {
+              if (!e.target.value) return
+              const [y, m, d] = e.target.value.split('-').map(Number)
+              setWeekStart(startOfWeek(new Date(y, m - 1, d)))
+            }}
+          />
+          {!isCurrentWeek && (
+            <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+              Heute
+            </Button>
+          )}
           <Button variant="outline" size="icon" onClick={() => setWeekStart((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -144,6 +163,8 @@ export default function CalendarPage() {
           </Button>
         </div>
       </div>
+
+      <p className="text-sm font-medium text-muted-foreground">{weekRangeLabel}</p>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3">
         <label className="flex items-center gap-2 text-sm font-medium">
