@@ -79,6 +79,36 @@ export function nextOccurrenceOnOrAfter(
   return formatDateOnly(occurrence)
 }
 
+/**
+ * Every occurrence date ("YYYY-MM-DD") of a recurring item that falls within [rangeStart, rangeEnd),
+ * computed live from the stored anchor date by stepping whole intervals in either direction - used
+ * for calendar month/year views, which need every occurrence in view, not just the next one.
+ */
+export function occurrencesInRange(
+  anchorDate: string,
+  interval: RecurrenceInterval,
+  customMonths: number | null | undefined,
+  rangeStart: Date,
+  rangeEnd: Date,
+): string[] {
+  const months = intervalToMonths(interval, customMonths)
+  const start = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate())
+  const end = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate())
+
+  let occurrence = parseDateOnly(anchorDate)
+  while (occurrence >= start) {
+    occurrence = new Date(occurrence.getFullYear(), occurrence.getMonth() - months, occurrence.getDate())
+  }
+
+  const results: string[] = []
+  occurrence = new Date(occurrence.getFullYear(), occurrence.getMonth() + months, occurrence.getDate())
+  while (occurrence < end) {
+    if (occurrence >= start) results.push(formatDateOnly(occurrence))
+    occurrence = new Date(occurrence.getFullYear(), occurrence.getMonth() + months, occurrence.getDate())
+  }
+  return results
+}
+
 export type BudgetStatus = 'green' | 'yellow' | 'red'
 
 /** Finanz-Ampel: green under 80%, yellow 80-100%, red over budget. */
