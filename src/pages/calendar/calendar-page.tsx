@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Repeat, Trash2, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,8 +12,21 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { useFamily } from '@/contexts/family-context'
 import { useAuth } from '@/contexts/auth-context'
 import { calendarService } from '@/services/calendar.service'
-import { cn, formatDate } from '@/lib/utils'
-import type { CalendarEventType, Tables } from '@/types/database.types'
+import { financeService } from '@/services/finance.service'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { INTERVAL_LABELS } from '@/lib/finance-labels'
+import type { CalendarEventType, RecurrenceInterval, Tables } from '@/types/database.types'
+
+interface DueItem {
+  id: string
+  name: string
+  amountCents: number
+  kind: 'expense' | 'income'
+}
+
+function toDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const EVENT_LABELS: Record<CalendarEventType, string> = {
   family: 'Familie',
@@ -41,8 +55,14 @@ export default function CalendarPage() {
   const { user } = useAuth()
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [events, setEvents] = useState<Tables<'calendar_events'>[]>([])
+  const [recurringExpenses, setRecurringExpenses] = useState<Tables<'recurring_expenses'>[]>([])
+  const [recurringIncome, setRecurringIncome] = useState<Tables<'recurring_income'>[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
+  const [showDueDates, setShowDueDates] = useState(true)
+  const [intervalFilter, setIntervalFilter] = useState<Set<RecurrenceInterval>>(
+    () => new Set(Object.keys(INTERVAL_LABELS) as RecurrenceInterval[]),
+  )
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i)),
@@ -55,7 +75,14 @@ export default function CalendarPage() {
     try {
       const rangeEnd = new Date(weekStart)
       rangeEnd.setDate(rangeEnd.getDate() + 7)
-      setEvents(await calendarService.getEvents(family.id, weekStart, rangeEnd))
+      const [evts, recExp, recInc] = await Promise.all([
+        calendarService.getEvents(family.id, weekStart, rangeEnd),
+        financeService.getRecurringExpenses(family.id),
+        financeService.getRecurringIncome(family.id),
+      ])
+      setEvents(evts)
+      setRecurringExpenses(recExp)
+      setRecurringIncome(recInc)
     } finally {
       setLoading(false)
     }
@@ -71,7 +98,35 @@ export default function CalendarPage() {
     setEvents((prev) => prev.filter((e) => e.id !== id))
   }
 
+  function toggleInterval(interval: RecurrenceInterval) {
+    setIntervalFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(interval)) next.delete(interval)
+      else next.add(interval)
+      return next
+    })
+  }
+
+  function dueItemsForDay(day: Date): DueItem[] {
+    if (!showDueDates) return []
+    const dateStr = toDateStr(day)
+    const due: DueItem[] = []
+    for (const r of recurringExpenses) {
+      if (r.next_due_date === dateStr && intervalFilter.has(r.interval)) {
+        due.push({ id: r.id, name: r.name, amountCents: r.amount_cents, kind: 'expense' })
+      }
+    }
+    for (const r of recurringIncome) {
+      if (r.next_due_date === dateStr && intervalFilter.has(r.interval)) {
+        due.push({ id: r.id, name: r.name, amountCents: r.amount_cents, kind: 'income' })
+      }
+    }
+    return due
+  }
+
   if (!family || !user) return null
+
+  const weekHasContent = events.length > 0 || (showDueDates && weekDays.some((day) => dueItemsForDay(day).length > 0))
 
   return (
     <div className="space-y-4">
@@ -85,6 +140,28 @@ export default function CalendarPage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={showDueDates} onChange={(e) => setShowDueDates(e.target.checked)} className="h-4 w-4" />
+          Zahlungsfälligkeiten anzeigen
+        </label>
+        {showDueDates && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {(Object.entries(INTERVAL_LABELS) as [RecurrenceInterval, string][]).map(([value, label]) => (
+              <label key={value} className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={intervalFilter.has(value)}
+                  onChange={() => toggleInterval(value)}
+                  className="h-3.5 w-3.5"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
       {formOpen ? (
@@ -117,13 +194,14 @@ export default function CalendarPage() {
             <Skeleton key={i} className="h-16 w-full" />
           ))}
         </div>
-      ) : events.length === 0 ? (
+      ) : !weekHasContent ? (
         <EmptyState emoji="📅" title="Euer Kalender ist noch leer" description="Fügt euren ersten gemeinsamen Termin hinzu." />
       ) : (
         <div className="space-y-4">
           {weekDays.map((day) => {
             const dayEvents = events.filter((e) => new Date(e.start_at).toDateString() === day.toDateString())
-            if (dayEvents.length === 0) return null
+            const dayDue = dueItemsForDay(day)
+            if (dayEvents.length === 0 && dayDue.length === 0) return null
             return (
               <Card key={day.toISOString()}>
                 <CardContent className="p-4">
@@ -131,6 +209,25 @@ export default function CalendarPage() {
                     {day.toLocaleDateString('de-DE', { weekday: 'long' })}, {formatDate(day)}
                   </p>
                   <div className="space-y-2">
+                    {dayDue.map((d) => (
+                      <Link
+                        key={d.id}
+                        to={d.kind === 'expense' ? '/finanzen/fixkosten' : '/finanzen/fixe-einnahmen'}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 hover:bg-muted/40"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Repeat className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">{d.name}</p>
+                            <Badge variant="secondary">Zahlung fällig</Badge>
+                          </div>
+                        </div>
+                        <p className={cn('text-sm font-semibold', d.kind === 'income' ? 'text-success' : 'text-foreground')}>
+                          {d.kind === 'income' ? '+' : ''}
+                          {formatCurrency(d.amountCents)}
+                        </p>
+                      </Link>
+                    ))}
                     {dayEvents.map((e) => (
                       <div key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
                         <div className="flex items-center gap-3">
