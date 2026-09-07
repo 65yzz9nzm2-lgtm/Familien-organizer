@@ -486,9 +486,22 @@ function EventForm({
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // The end time is on the same `date` as the start time (no separate end-date field), so if the
+  // user pushes the start time past the still-default end time, keep them consistent instead of
+  // silently producing an end-before-start event that the database will reject.
+  function handleStartTimeChange(value: string) {
+    setStartTime(value)
+    if (value >= endTime) {
+      const [h, m] = value.split(':').map(Number)
+      const bumped = Math.min(h * 60 + m + 60, 23 * 60 + 59)
+      setEndTime(`${String(Math.floor(bumped / 60)).padStart(2, '0')}:${String(bumped % 60).padStart(2, '0')}`)
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return setError('Bitte gib einen Titel ein.')
+    if (endTime <= startTime) return setError('Die Endzeit muss nach der Startzeit liegen.')
     setSubmitting(true)
     setError(null)
     try {
@@ -525,7 +538,7 @@ function EventForm({
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Von</Label>
-          <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          <Input type="time" value={startTime} onChange={(e) => handleStartTimeChange(e.target.value)} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Bis</Label>
