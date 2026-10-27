@@ -1,0 +1,43 @@
+name: Keep Supabase awake
+
+# Supabase pauses free-tier projects after about a week without any
+# database activity, which takes login and every page of the app down
+# until someone restores it by hand in the Supabase dashboard. A tiny
+# read twice a week counts as activity and keeps the project running.
+#
+# The request uses only the public anon/publishable key (the same one
+# baked into the deployed app) and reads one id from the built-in
+# default categories, so it touches no family data. If the project is
+# already paused, the request fails and GitHub emails a failed-run
+# notice, which doubles as an early warning.
+
+on:
+  schedule:
+    - cron: '23 7 * * 1,4' # Mondays and Thursdays, 07:23 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    # Same environment as the deploy workflow, so the Supabase secrets are
+    # visible whether they were added as repository or environment secrets.
+    environment:
+      name: github-pages
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY secret is missing."
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 30 \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/expense_categories?select=id&limit=1" > /dev/null
+          echo "Supabase responded, project is awake."
